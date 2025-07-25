@@ -1,0 +1,266 @@
+@import "tailwindcss";
+
+:root {
+  --color-primario: #CD9FFF; /* Tu color morado original */
+  --color-secundario: #E4C1FF; /* Morado más claro */
+  --color-terciario: #F0D9FF; /* Morado muy claro */
+  --color-cuarto: #F8EFFF; /* Morado casi blanco */
+  --color-quinto: #F3F4F6; /* Gray-100 */
+  --fondo: #FAFAFA; /* Light background */
+  --boton-House: #B785FF; /* Morado para botones */
+  --color-rojo1: #FCA5A5; /* Red-300 */
+  --color-rojo2: #DC2626; /* Red-600 */
+}
+
+.navbar-dropdown-modal-anim {
+  animation: navbarDropdownModal 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.active-press {
+  animation: pulse-bg 0.6s ease-in-out infinite;
+}
+
+/* Animacion Abrir ventana */
+.dropdown {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+/* Clase para mostrar el dropdown con animación */
+.dropdown-show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.settings-slide-in {
+  animation: settingsSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.macos-elastic-open {
+  animation: macos-elastic-open 0.55s cubic-bezier(0.23, 1.2, 0.32, 1) both;
+}
+
+/* Animacion de pulsar */
+@keyframes pulse-bg {
+  0% {
+    background-color: var(--color-quinto);
+    opacity: 0.8;
+  }
+  50% {
+    background-color: var(--color-quinto);
+    opacity: 0.6;
+  }
+  100% {
+    background-color: var(--color-quinto);
+    opacity: 0.8;
+  }
+}
+
+@keyframes navbarDropdownModal {
+  0% {
+    opacity: 0;
+    transform: translateY(-1rem) scaleY(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes settingsSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes macos-elastic-open {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) translateY(60px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08) translateY(-10px);
+  }
+  80% {
+    transform: scale(0.97) translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Custom Tailwind utilities */
+.w-55 { width: 13.75rem; }
+.w-50 { width: 12.5rem; }
+.w-60 { width: 15rem; }
+.w-65 { width: 16.25rem; }
+.h-30 { height: 7.5rem; }
+.h-13 { height: 3.25rem; }
+.h-57 { height: 14.25rem; }
+.h-34 { height: 8.5rem; }
+.h-18 { height: 4.5rem; }
+.h-11\/12 { height: 91.666667%; }
+.w-21 { width: 5.25rem; }
+.h-21 { height: 5.25rem; }
+.pt-13 { padding-top: 3.25rem; }
+.z-70 { z-index: 70; }
+.rounded-4xl { border-radius: 2rem; }
+.border-1 { border-width: 1px; }
+.border-r-1 { border-right-width: 1px; }
+
+/* Color personalizado para selección */
+.bg-custom-pink {
+  background-color: #F638F0;
+  box-shadow: 0 4px 15px rgba(246, 56, 240, 0.4);
+}
+
+.text-custom-pink {
+  color: #F638F0;
+}
+
+/* Estilos para botones */
+.button-style {
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.shadow-glow {
+  box-shadow: 0 0 20px rgba(246, 56, 240, 0.5), 0 4px 15px rgba(246, 56, 240, 0.3);
+}
+
+.shadow-purple {
+  box-shadow: 0 3px 10px rgba(165, 132, 255, 0.3);
+}
+
+/* Efecto de resaltado adicional */
+.button-style:hover {
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+  transform: translateY(-2px);
+}
+
+.button-style:active {
+  transform: translateY(0px);
+}
+
+.bg-custom-pink {
+  background: linear-gradient(135deg, #F638F0 0%, #E91E63 50%, #F638F0 100%);
+}
+
+/* Efecto de brillo en hover */
+.bg-purple-600:hover {
+  background: linear-gradient(135deg, #A584FF 0%, #9575FF 50%, #A584FF 100%);
+}
+
+/* Mejoras para el sidebar */
+.sidebar-rounded {
+  border-top-right-radius: 2rem;
+  border-bottom-right-radius: 2rem;
+  background-color: var(--color-primario);
+}
+
+.bottom-nav-rounded {
+  border-top-left-radius: 2rem;
+  border-top-right-radius: 2rem;
+  background-color: var(--color-primario);
+}
+
+/* Blue theme */
+.blue {
+  --color-primario: #3B82F6;
+  --color-secundario: #60A5FA;
+  --color-terciario: #93C5FD;
+  --color-cuarto: #DBEAFE;
+  --boton-House: #2563EB;
+}
+
+/* Green theme */
+.green {
+  --color-primario: #10B981;
+  --color-secundario: #34D399;
+  --color-terciario: #6EE7B7;
+  --color-cuarto: #D1FAE5;
+  --boton-House: #059669;
+}
+
+/* Orange theme */
+.orange {
+  --color-primario: #F97316;
+  --color-secundario: #FB923C;
+  --color-terciario: #FDBA74;
+  --color-cuarto: #FED7AA;
+  --boton-House: #EA580C;
+}
+
+/* Red theme */
+.red {
+  --color-primario: #EF4444;
+  --color-secundario: #F87171;
+  --color-terciario: #FCA5A5;
+  --color-cuarto: #FECACA;
+  --boton-House: #DC2626;
+}
+
+/* Pink theme */
+.pink {
+  --color-primario: #EC4899;
+  --color-secundario: #F472B6;
+  --color-terciario: #F9A8D4;
+  --color-cuarto: #FCE7F3;
+  --boton-House: #DB2777;
+}
+
+/* Teal theme */
+.teal {
+  --color-primario: #14B8A6;
+  --color-secundario: #5EEAD4;
+  --color-terciario: #99F6E4;
+  --color-cuarto: #CCFBF1;
+  --boton-House: #0F766E;
+}
+
+/* Indigo theme */
+.indigo {
+  --color-primario: #6366F1;
+  --color-secundario: #818CF8;
+  --color-terciario: #A5B4FC;
+  --color-cuarto: #C7D2FE;
+  --boton-House: #4F46E5;
+}
+
+/* Yellow theme */
+.yellow {
+  --color-primario: #F59E0B;
+  --color-secundario: #FBBF24;
+  --color-terciario: #FCD34D;
+  --color-cuarto: #FEF3C7;
+  --boton-House: #D97706;
+}
+
+/* Cyan theme */
+.cyan {
+  --color-primario: #06B6D4;
+  --color-secundario: #67E8F9;
+  --color-terciario: #A5F3FC;
+  --color-cuarto: #CFFAFE;
+  --boton-House: #0891B2;
+}
+
+ 

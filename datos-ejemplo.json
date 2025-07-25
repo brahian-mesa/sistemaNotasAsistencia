@@ -1,0 +1,146 @@
+{
+  "estudiantes": [
+    {
+      "nombre": "Juan Carlos",
+      "apellido": "González",
+      "email": "juan.gonzalez@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "María Fernanda",
+      "apellido": "Rodríguez",
+      "email": "maria.rodriguez@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Carlos Andrés",
+      "apellido": "López",
+      "email": "carlos.lopez@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Ana Sofía",
+      "apellido": "Martínez",
+      "email": "ana.martinez@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Diego Alejandro",
+      "apellido": "Herrera",
+      "email": "diego.herrera@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Valentina",
+      "apellido": "Ramírez",
+      "email": "valentina.ramirez@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Santiago",
+      "apellido": "Torres",
+      "email": "santiago.torres@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Isabella",
+      "apellido": "Jiménez",
+      "email": "isabella.jimenez@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Mateo",
+      "apellido": "Díaz",
+      "email": "mateo.diaz@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Camila",
+      "apellido": "Moreno",
+      "email": "camila.moreno@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Nicolás",
+      "apellido": "Vargas",
+      "email": "nicolas.vargas@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Sofía",
+      "apellido": "Rojas",
+      "email": "sofia.rojas@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Andrés Felipe",
+      "apellido": "Silva",
+      "email": "andres.silva@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Daniela",
+      "apellido": "Castro",
+      "email": "daniela.castro@estudiante.edu.co",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Sebastián",
+      "apellido": "Mendoza",
+      "email": "sebastian.mendoza@estudiante.edu.co",
+      "grado": "5B"
+    }
+  ],
+  "materias": [
+    {
+      "nombre": "Matemáticas",
+      "descripcion": "Matemáticas básicas para quinto grado",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Lenguaje",
+      "descripcion": "Comunicación y lenguaje español",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Ciencias Naturales",
+      "descripcion": "Ciencias naturales y experimentos",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Ciencias Sociales",
+      "descripcion": "Historia y geografía",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Inglés",
+      "descripcion": "Idioma extranjero inglés",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Educación Física",
+      "descripcion": "Deportes y actividad física",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Arte",
+      "descripcion": "Expresión artística y manualidades",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Religión",
+      "descripcion": "Educación religiosa y valores",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Tecnología",
+      "descripcion": "Informática y tecnología",
+      "grado": "5B"
+    },
+    {
+      "nombre": "Ética",
+      "descripcion": "Valores y convivencia ciudadana",
+      "grado": "5B"
+    }
+  ]
+} 

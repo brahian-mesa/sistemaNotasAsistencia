@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../style/Navbar.css";
+import auth from "../utils/auth";
 import { Table, Row, Col, Button, Container } from "react-bootstrap";
 import EditUsernameModal from "./EditUsernameModal";
 import { GoHomeFill } from "react-icons/go"; // home icon
@@ -25,9 +26,9 @@ export default function Sidebar() {
     const [showSettingsPanel, setShowSettingsPanel] = useState(false);
     const [selectedSettingsTab, setSelectedSettingsTab] = useState("account");
     const [showLogoutModal, setShowLogoutModal] = useState(false);
-    const [username, setUsername] = useState("Usuario");
+    const [username, setUsername] = useState(auth.getCurrentUser()?.nombre || "Usuario");
     const [showEditModal, setShowEditModal] = useState(false);
-    const [userEmail, setUserEmail] = useState("usuario@email.com");
+    const [userEmail, setUserEmail] = useState(auth.getCurrentUser()?.usuario || "usuario@email.com");
 
     const settingsPanelRef = useRef(null);
 
@@ -195,7 +196,7 @@ export default function Sidebar() {
                                                 <button
                                                     className="px-5 py-2 bg-[var(--color-rojo1)] text-[var(--color-rojo2)] font-medium hover:bg-[#ff867a] rounded-4xl transition-colors cursor-pointer"
                                                     onClick={() => {
-                                                        localStorage.removeItem("user");
+                                                        auth.logout();
                                                         setShowLogoutModal(false);
                                                         navigate("/");
                                                     }}

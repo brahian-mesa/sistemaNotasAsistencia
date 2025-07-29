@@ -13,7 +13,28 @@ export default function Materias() {
     const [editingMateria, setEditingMateria] = useState(null)
     const [selectedMateria, setSelectedMateria] = useState(null)
     const [showAddStudentModal, setShowAddStudentModal] = useState(false)
-    const [selectedPeriodo, setSelectedPeriodo] = useState(1)
+    const [selectedPeriodo, setSelectedPeriodo] = useState(() => {
+        // Inicializar con el período académico actual
+        const hoy = new Date()
+        const fechaHoy = hoy.toISOString().split('T')[0]
+        
+        // Definición temporal para la inicialización
+        const periodos = {
+            1: { fechaInicio: '2025-01-27', fechaFin: '2025-04-04' },
+            2: { fechaInicio: '2025-04-07', fechaFin: '2025-06-16' },
+            3: { fechaInicio: '2025-07-07', fechaFin: '2025-09-12' },
+            4: { fechaInicio: '2025-09-15', fechaFin: '2025-11-28' }
+        }
+        
+        for (let periodo = 1; periodo <= 4; periodo++) {
+            const { fechaInicio, fechaFin } = periodos[periodo]
+            if (fechaHoy >= fechaInicio && fechaHoy <= fechaFin) {
+                return periodo
+            }
+        }
+        
+        return 1 // Por defecto, período 1
+    })
     const [showAddTipoNotaModal, setShowAddTipoNotaModal] = useState(false)
     const [tipoNotaForm, setTipoNotaForm] = useState({ titulo: '', descripcion: '' })
     const [notasTemporales, setNotasTemporales] = useState({})
@@ -32,6 +53,57 @@ export default function Materias() {
 
     // Estado para indicador de guardado automático
     const [autoSaveStatus, setAutoSaveStatus] = useState('')
+
+    // Definición de períodos académicos con fechas específicas
+    const periodosAcademicos = {
+        1: { 
+            nombre: 'Período 1', 
+            fechaInicio: '2025-01-27', 
+            fechaFin: '2025-04-04',
+            descripcion: '27 Ene - 4 Abr' 
+        },
+        2: { 
+            nombre: 'Período 2', 
+            fechaInicio: '2025-04-07', 
+            fechaFin: '2025-06-16',
+            descripcion: '7 Abr - 16 Jun' 
+        },
+        3: { 
+            nombre: 'Período 3', 
+            fechaInicio: '2025-07-07', 
+            fechaFin: '2025-09-12',
+            descripcion: '7 Jul - 12 Sep' 
+        },
+        4: { 
+            nombre: 'Período 4', 
+            fechaInicio: '2025-09-15', 
+            fechaFin: '2025-11-28',
+            descripcion: '15 Sep - 28 Nov' 
+        }
+    }
+
+    // Función para obtener el período actual basado en la fecha de hoy
+    const obtenerPeriodoActual = () => {
+        const hoy = new Date()
+        const fechaHoy = hoy.toISOString().split('T')[0] // Formato YYYY-MM-DD
+        
+        for (let periodo = 1; periodo <= 4; periodo++) {
+            const { fechaInicio, fechaFin } = periodosAcademicos[periodo]
+            if (fechaHoy >= fechaInicio && fechaHoy <= fechaFin) {
+                return periodo
+            }
+        }
+        
+        // Si no está en ningún período, determinar el más cercano
+        for (let periodo = 1; periodo <= 4; periodo++) {
+            const { fechaInicio } = periodosAcademicos[periodo]
+            if (fechaHoy < fechaInicio) {
+                return periodo
+            }
+        }
+        
+        return 1 // Por defecto, período 1
+    }
 
     // Función para mostrar estado de guardado
     const mostrarEstadoGuardado = (mensaje) => {
@@ -528,7 +600,7 @@ export default function Materias() {
 
         // Obtener todas las actividades del período seleccionado
         const tiposActividad = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
-        const nombresPeriodos = ['Período 1', 'Período 2', 'Período 3', 'Período 4']
+        const nombresPeriodos = Object.values(periodosAcademicos).map(p => `${p.nombre} (${p.descripcion})`)
 
         if (tiposActividad.length > 0) {
             // Encabezados para actividades específicas
@@ -566,7 +638,10 @@ export default function Materias() {
             })
         } else {
             // Si no hay actividades, mostrar solo promedios por período
-            const encabezados = ['Estudiante', 'Período 1', 'Período 2', 'Período 3', 'Período 4', 'Promedio General']
+            const encabezados = ['Estudiante', 
+                ...Object.values(periodosAcademicos).map(p => `${p.nombre} (${p.descripcion})`), 
+                'Promedio General'
+            ]
             datosHoja.push(encabezados)
 
             estudiantes.forEach(estudiante => {

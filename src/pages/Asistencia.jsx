@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDownIcon, ChevronUpIcon, UserGroupIcon, CalendarIcon, ChartBarIcon } from '@heroicons/react/24/outline'
+import { ChevronDownIcon, ChevronUpIcon, UserGroupIcon, CalendarIcon, ChartBarIcon, UserPlusIcon } from '@heroicons/react/24/outline'
 import PageContainer from '../components/PageContainer'
 import * as XLSX from 'xlsx'
 import db from '../utils/database'
@@ -10,9 +10,70 @@ export default function Asistencia() {
     const [showEstadisticas, setShowEstadisticas] = useState(false)
     const [diasFestivos, setDiasFestivos] = useState([])
 
+    // Definición de períodos académicos con fechas específicas
+    const periodosAcademicos = {
+        1: {
+            nombre: 'Período 1',
+            fechaInicio: '2025-01-27',
+            fechaFin: '2025-04-04',
+            descripcion: '27 Ene - 4 Abr'
+        },
+        2: {
+            nombre: 'Período 2',
+            fechaInicio: '2025-04-07',
+            fechaFin: '2025-06-16',
+            descripcion: '7 Abr - 16 Jun'
+        },
+        3: {
+            nombre: 'Período 3',
+            fechaInicio: '2025-07-07',
+            fechaFin: '2025-09-12',
+            descripcion: '7 Jul - 12 Sep'
+        },
+        4: {
+            nombre: 'Período 4',
+            fechaInicio: '2025-09-15',
+            fechaFin: '2025-11-28',
+            descripcion: '15 Sep - 28 Nov'
+        }
+    }
+
+    // Función para obtener el período actual basado en la fecha de hoy
+    const obtenerPeriodoActual = () => {
+        const hoy = new Date()
+        const fechaHoy = hoy.toISOString().split('T')[0] // Formato YYYY-MM-DD
+
+        for (let periodo = 1; periodo <= 4; periodo++) {
+            const { fechaInicio, fechaFin } = periodosAcademicos[periodo]
+            if (fechaHoy >= fechaInicio && fechaHoy <= fechaFin) {
+                return periodo
+            }
+        }
+
+        // Si no está en ningún período, determinar el más cercano
+        for (let periodo = 1; periodo <= 4; periodo++) {
+            const { fechaInicio } = periodosAcademicos[periodo]
+            if (fechaHoy < fechaInicio) {
+                return periodo
+            }
+        }
+
+        return 1 // Por defecto, período 1
+    }
+
+    // Estado para período seleccionado (inicializar con período actual)
+    const [periodoSeleccionado, setPeriodoSeleccionado] = useState(() => obtenerPeriodoActual())
+
     // Cargar datos desde la base de datos - igual que en Materias
     const [materias, setMaterias] = useState([])
     const [estudiantes, setEstudiantes] = useState([])
+
+    // Estados para modal de agregar estudiante
+    const [showAddStudentModal, setShowAddStudentModal] = useState(false)
+    const [studentForm, setStudentForm] = useState({
+        nombre: '',
+        codigo: ''
+    })
 
     // Estados para indicador de guardado automático
     const [autoSaveStatus, setAutoSaveStatus] = useState('')
@@ -21,6 +82,78 @@ export default function Asistencia() {
     const mostrarEstadoGuardado = (mensaje) => {
         setAutoSaveStatus(mensaje)
         setTimeout(() => setAutoSaveStatus(''), 2000)
+    }
+
+    // Función para filtrar asistencias por período académico
+    const filtrarAsistenciasPorPeriodo = (asistencias, periodo) => {
+        const { fechaInicio, fechaFin } = periodosAcademicos[periodo]
+        return asistencias.filter(asistencia =>
+            asistencia.fecha >= fechaInicio && asistencia.fecha <= fechaFin
+        )
+    }
+
+    // Función para generar el siguiente código disponible (igual que en Materias)
+    const generarSiguienteCodigo = (codigoBase) => {
+        // Extraer la parte base (letras + números) del código
+        const match = codigoBase.match(/^([A-Za-z]+\d+)(\d*)$/)
+        if (!match) return codigoBase
+
+        const base = match[1] // ej: "5B01"
+        let numeroActual = parseInt(match[2] || "1") // ej: "1" del "5B011"
+
+        // Obtener todos los códigos existentes que empiecen con la misma base
+        const codigosExistentes = estudiantes
+            .map(est => est.codigo)
+            .filter(codigo => codigo.startsWith(base))
+            .map(codigo => {
+                const numMatch = codigo.match(new RegExp(`^${base}(\\d+)$`))
+                return numMatch ? parseInt(numMatch[1]) : 0
+            })
+            .sort((a, b) => a - b)
+
+        // Encontrar el primer número disponible
+        let siguienteNumero = 1
+        for (const num of codigosExistentes) {
+            if (num === siguienteNumero) {
+                siguienteNumero++
+            } else {
+                break
+            }
+        }
+
+        return `${base}${siguienteNumero.toString().padStart(match[2]?.length || 1, '0')}`
+    }
+
+    // Función para agregar estudiante (igual que en Materias)
+    const handleAddStudent = () => {
+        if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) return
+
+        try {
+            let codigoFinal = studentForm.codigo.trim()
+
+            // Verificar si el código ya existe
+            const codigoExiste = estudiantes.some(est => est.codigo === codigoFinal)
+            if (codigoExiste) {
+                // Generar automáticamente el siguiente código disponible
+                codigoFinal = generarSiguienteCodigo(codigoFinal)
+                mostrarEstadoGuardado(`📝 Código actualizado automáticamente: ${codigoFinal}`)
+            }
+
+            const nuevoEstudiante = {
+                nombre: studentForm.nombre.trim(),
+                codigo: codigoFinal
+            }
+
+            const estudianteGuardado = db.guardarEstudiante(nuevoEstudiante)
+            setEstudiantes(prev => [...prev, estudianteGuardado].sort((a, b) => a.codigo.localeCompare(b.codigo)))
+            setStudentForm({ nombre: '', codigo: '' })
+            setShowAddStudentModal(false)
+            console.log('✅ Estudiante agregado:', estudianteGuardado)
+            mostrarEstadoGuardado(`✅ Estudiante agregado: ${estudianteGuardado.codigo}`)
+        } catch (error) {
+            console.error('❌ Error agregando estudiante:', error)
+            alert('Error al agregar el estudiante')
+        }
     }
 
     // Cargar datos al inicializar - igual que en Materias
@@ -34,7 +167,8 @@ export default function Asistencia() {
             const estudiantesDB = db.getEstudiantes()
 
             setMaterias(materiasDB)
-            setEstudiantes(estudiantesDB)
+            // Ordenar estudiantes por código automáticamente
+            setEstudiantes(estudiantesDB.sort((a, b) => a.codigo.localeCompare(b.codigo)))
 
             console.log('✅ Datos cargados desde la base de datos:')
             console.log('📚 Materias:', materiasDB.length)
@@ -147,10 +281,12 @@ export default function Asistencia() {
         return asistencias[clave]?.estado || ''
     }
 
-    // Calcular estadísticas de faltas
+    // Calcular estadísticas de faltas por período
     const calcularEstadisticasFaltas = () => {
         try {
-            const asistenciasGuardadas = JSON.parse(localStorage.getItem('sistema_escolar_asistencias') || '[]')
+            const todasAsistencias = JSON.parse(localStorage.getItem('sistema_escolar_asistencias') || '[]')
+            // Filtrar asistencias por período seleccionado
+            const asistenciasDelPeriodo = filtrarAsistenciasPorPeriodo(todasAsistencias, periodoSeleccionado)
             const estadisticas = []
 
             estudiantes.forEach(estudiante => {
@@ -161,9 +297,9 @@ export default function Asistencia() {
                     faltasPorMateria[materia.codigo] = 0
                 })
 
-                // Contar faltas - UNA por día, no por materia
+                // Contar faltas - UNA por día, no por materia - SOLO del período seleccionado
                 const fechasConFaltas = new Set()
-                asistenciasGuardadas.forEach(asistencia => {
+                asistenciasDelPeriodo.forEach(asistencia => {
                     if (asistencia.estudiante_id === estudiante.id && asistencia.estado === 'ausente') {
                         fechasConFaltas.add(asistencia.fecha)
                     }
@@ -186,7 +322,8 @@ export default function Asistencia() {
                 estadisticas.push({
                     estudiante: estudiante.nombre,
                     codigoEstudiante: estudiante.codigo,
-                    faltasPorMateria: faltasPorMateria
+                    faltasPorMateria: faltasPorMateria,
+                    totalFaltas: fechasConFaltas.size
                 })
             })
 
@@ -197,34 +334,39 @@ export default function Asistencia() {
         }
     }
 
-    // Exportar a Excel con TODAS las asistencias guardadas
+    // Exportar a Excel con asistencias del período seleccionado
     const exportarAsistenciaExcel = () => {
         try {
-            // Obtener TODAS las asistencias guardadas
-            const asistenciasGuardadas = JSON.parse(localStorage.getItem('sistema_escolar_asistencias') || '[]')
+            // Obtener todas las asistencias y filtrar por período
+            const todasAsistencias = JSON.parse(localStorage.getItem('sistema_escolar_asistencias') || '[]')
+            const asistenciasDelPeriodo = filtrarAsistenciasPorPeriodo(todasAsistencias, periodoSeleccionado)
 
-            if (asistenciasGuardadas.length === 0) {
-                alert('⚠️ No hay asistencias guardadas para exportar.')
+            if (asistenciasDelPeriodo.length === 0) {
+                alert(`⚠️ No hay asistencias guardadas para el ${periodosAcademicos[periodoSeleccionado].nombre}.`)
                 return
             }
 
-            // Obtener todas las fechas únicas
-            const fechasUnicas = [...new Set(asistenciasGuardadas.map(a => a.fecha))].sort()
+            // Obtener todas las fechas únicas del período
+            const fechasUnicas = [...new Set(asistenciasDelPeriodo.map(a => a.fecha))].sort()
 
             // Convertir asistencias a formato fácil de usar
             const asistenciasFormateadas = {}
-            asistenciasGuardadas.forEach(asistencia => {
+            asistenciasDelPeriodo.forEach(asistencia => {
                 const clave = `${asistencia.fecha}-${asistencia.estudiante_id}`
                 asistenciasFormateadas[clave] = asistencia.estado
             })
 
+            // Información del período seleccionado
+            const periodoInfo = periodosAcademicos[periodoSeleccionado]
+
             // Encabezado institucional
             const datosHoja = []
             datosHoja.push(['🏫', 'Institución Educativa Nuestra Señora De los Dolores'])
-            datosHoja.push(['', 'REGISTRO COMPLETO DE ASISTENCIA'])
+            datosHoja.push(['', `REGISTRO DE ASISTENCIA - ${periodoInfo.nombre.toUpperCase()}`])
             datosHoja.push(['', 'Sede Salvador Duque, grado 5B'])
-            datosHoja.push(['', `Período: ${fechasUnicas[0]} a ${fechasUnicas[fechasUnicas.length - 1]}`])
-            datosHoja.push(['', `Total de días registrados: ${fechasUnicas.length}`])
+            datosHoja.push(['', `Período académico: ${periodoInfo.descripcion}`])
+            datosHoja.push(['', `Fechas del período: ${periodoInfo.fechaInicio} al ${periodoInfo.fechaFin}`])
+            datosHoja.push(['', `Días con registro: ${fechasUnicas.length}`])
             datosHoja.push([])
 
             // Encabezados de tabla
@@ -272,14 +414,14 @@ export default function Asistencia() {
             ]
             ws['!cols'] = colWidths
 
-            XLSX.utils.book_append_sheet(wb, ws, 'Asistencia')
+            XLSX.utils.book_append_sheet(wb, ws, `Asistencia ${periodoInfo.nombre}`)
 
             // Nombre del archivo
-            const nombreArchivo = `asistencia_completa_${fechasUnicas[0]}_a_${fechasUnicas[fechasUnicas.length - 1]}.xlsx`
+            const nombreArchivo = `asistencia_${periodoInfo.nombre.toLowerCase().replace(' ', '_')}_${periodoInfo.fechaInicio}_${periodoInfo.fechaFin}.xlsx`
 
             XLSX.writeFile(wb, nombreArchivo)
 
-            alert(`✅ EXCEL EXPORTADO EXITOSAMENTE!\n\n📊 Resumen:\n• ${fechasUnicas.length} días con datos\n• ${asistenciasGuardadas.length} registros totales\n• Todas las asistencias guardadas incluidas\n\n💾 Archivo: ${nombreArchivo}`)
+            alert(`✅ EXCEL EXPORTADO EXITOSAMENTE!\n\n📊 Resumen del ${periodoInfo.nombre}:\n• ${fechasUnicas.length} días con registro\n• ${asistenciasDelPeriodo.length} registros del período\n• Período: ${periodoInfo.descripcion}\n\n💾 Archivo: ${nombreArchivo}`)
 
         } catch (error) {
             console.error('❌ Error exportando Excel:', error)
@@ -305,7 +447,13 @@ export default function Asistencia() {
         })
     }, [fechaSeleccionada])
 
-    const estadisticas = calcularEstadisticasFaltas()
+    const [estadisticas, setEstadisticas] = useState([])
+
+    // Recalcular estadísticas cuando cambie el período seleccionado
+    useEffect(() => {
+        const nuevasEstadisticas = calcularEstadisticasFaltas()
+        setEstadisticas(nuevasEstadisticas)
+    }, [periodoSeleccionado, estudiantes, materias])
 
     return (
         <PageContainer title="Control de Asistencia - Grado 5B" subtitle="Registro diario de asistencia">
@@ -318,26 +466,49 @@ export default function Asistencia() {
                     </div>
                 )}
 
-                {/* Selector de fecha */}
+                {/* Selector de fecha y período */}
                 <div className="bg-white/95 p-4 md:p-6 rounded-xl shadow-lg border border-white/40 backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center">
                             <CalendarIcon className="h-8 w-8 text-purple-600 mr-3" />
                             <h2 className="text-xl md:text-2xl font-bold text-purple-800">
-                                Seleccionar Fecha
+                                Seleccionar Fecha y Período
                             </h2>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <input
-                            type="date"
-                            value={fechaSeleccionada}
-                            onChange={(e) => setFechaSeleccionada(e.target.value)}
-                            className="px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                        <span className="text-purple-700 font-medium">
-                            {obtenerDiaSemana(fechaSeleccionada).charAt(0).toUpperCase() + obtenerDiaSemana(fechaSeleccionada).slice(1)}
-                        </span>
+                    <div className="flex items-center gap-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                            <label className="text-purple-700 font-medium">Fecha:</label>
+                            <input
+                                type="date"
+                                value={fechaSeleccionada}
+                                onChange={(e) => setFechaSeleccionada(e.target.value)}
+                                className="px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            />
+                            <span className="text-purple-700 font-medium">
+                                {obtenerDiaSemana(fechaSeleccionada).charAt(0).toUpperCase() + obtenerDiaSemana(fechaSeleccionada).slice(1)}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <label className="text-purple-700 font-medium">Período Académico:</label>
+                            <select
+                                value={periodoSeleccionado}
+                                onChange={(e) => setPeriodoSeleccionado(parseInt(e.target.value))}
+                                className="px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                            >
+                                {Object.entries(periodosAcademicos).map(([num, periodo]) => (
+                                    <option key={num} value={num}>
+                                        {periodo.nombre} ({periodo.descripcion})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="mt-3 p-3 bg-purple-50 rounded-lg">
+                        <p className="text-sm text-purple-700">
+                            <strong>Período seleccionado:</strong> {periodosAcademicos[periodoSeleccionado].nombre}
+                            <span className="ml-2">del {periodosAcademicos[periodoSeleccionado].fechaInicio} al {periodosAcademicos[periodoSeleccionado].fechaFin}</span>
+                        </p>
                     </div>
                 </div>
 
@@ -351,6 +522,13 @@ export default function Asistencia() {
                                     Registro de Asistencia
                                 </h2>
                             </div>
+                            <button
+                                onClick={() => setShowAddStudentModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                            >
+                                <UserPlusIcon className="h-5 w-5" />
+                                Agregar Estudiante
+                            </button>
                         </div>
 
                         <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
@@ -481,9 +659,14 @@ export default function Asistencia() {
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center">
                                 <ChartBarIcon className="h-8 w-8 text-blue-600 mr-3" />
-                                <h2 className="text-xl md:text-2xl font-bold text-blue-800">
-                                    Estadísticas de Faltas por Materia
-                                </h2>
+                                <div>
+                                    <h2 className="text-xl md:text-2xl font-bold text-blue-800">
+                                        Estadísticas de Faltas por Materia
+                                    </h2>
+                                    <p className="text-sm text-blue-600 mt-1">
+                                        {periodosAcademicos[periodoSeleccionado].nombre} ({periodosAcademicos[periodoSeleccionado].descripcion})
+                                    </p>
+                                </div>
                             </div>
                             <button
                                 onClick={() => setShowEstadisticas(false)}
@@ -543,6 +726,61 @@ export default function Asistencia() {
                                     })}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal Agregar Estudiante */}
+                {showAddStudentModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4">Agregar Nuevo Estudiante</h3>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Nombre del estudiante
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={studentForm.nombre}
+                                        onChange={(e) => setStudentForm(prev => ({ ...prev, nombre: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                        placeholder="Ej: María González"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Código del estudiante
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={studentForm.codigo}
+                                        onChange={(e) => setStudentForm(prev => ({ ...prev, codigo: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                        placeholder="Ej: 5B011"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button
+                                    onClick={() => {
+                                        setShowAddStudentModal(false)
+                                        setStudentForm({ nombre: '', codigo: '' })
+                                    }}
+                                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleAddStudent}
+                                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                                >
+                                    Agregar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

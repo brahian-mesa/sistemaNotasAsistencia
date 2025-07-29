@@ -52,9 +52,10 @@ export default function Materias() {
             setMaterias(materiasDB)
             setEstudiantes(estudiantesDB)
 
-            // Cargar tipos de nota persistidos
+            // Cargar tipos de nota persistidos y migrar si es necesario
             const tiposNotaGuardados = db.getTiposNotaPeriodo()
-            setTiposNotaPeriodo(tiposNotaGuardados)
+            const tiposNotaMigrados = migrarTiposNota(tiposNotaGuardados, materiasDB)
+            setTiposNotaPeriodo(tiposNotaMigrados)
 
             // Cargar notas detalladas
             const notasGuardadas = db.getNotasDetalladas()
@@ -63,11 +64,44 @@ export default function Materias() {
             console.log('✅ Datos cargados desde la base de datos:')
             console.log('📚 Materias:', materiasDB.length)
             console.log('👥 Estudiantes:', estudiantesDB.length)
-            console.log('📝 Tipos de nota:', Object.keys(tiposNotaGuardados).length)
+            console.log('📝 Tipos de nota:', Object.keys(tiposNotaMigrados).length)
             console.log('🎯 Notas cargadas:', Object.keys(notasGuardadas).length)
         } catch (error) {
             console.error('❌ Error cargando datos:', error)
         }
+    }
+
+    // Función para migrar datos de tipos de nota del formato antiguo al nuevo
+    const migrarTiposNota = (tiposNotaGuardados, materias) => {
+        // Si ya está en el nuevo formato (tiene materiaId como clave), retornar tal como está
+        if (Object.keys(tiposNotaGuardados).length === 0) {
+            return tiposNotaGuardados
+        }
+
+        const primeraClaveEsMateria = materias.some(materia =>
+            tiposNotaGuardados.hasOwnProperty(materia.id)
+        )
+
+        if (primeraClaveEsMateria) {
+            // Ya está en el nuevo formato
+            return tiposNotaGuardados
+        }
+
+        // Está en formato antiguo, migrar a nuevo formato
+        console.log('🔄 Migrando tipos de nota al nuevo formato...')
+        const tiposNotaMigrados = {}
+
+        // Para cada materia, copiar los tipos de nota globales
+        materias.forEach(materia => {
+            tiposNotaMigrados[materia.id] = { ...tiposNotaGuardados }
+        })
+
+        // Guardar en el nuevo formato
+        setTimeout(() => {
+            db.guardarTiposNotaPeriodo(tiposNotaMigrados)
+        }, 100)
+
+        return tiposNotaMigrados
     }
 
     // Auto-guardar tipos de nota cuando cambien
@@ -183,22 +217,78 @@ export default function Materias() {
                 [materia.id]: nuevasNotas
             }))
         }
+
+        // Inicializar tipos de nota para esta materia si no existen
+        if (!tiposNotaPeriodo[materia.id]) {
+            setTiposNotaPeriodo(prev => ({
+                ...prev,
+                [materia.id]: {
+                    1: [],
+                    2: [],
+                    3: [],
+                    4: []
+                }
+            }))
+        }
+    }
+
+    // Función para generar el siguiente código disponible
+    const generarSiguienteCodigo = (codigoBase) => {
+        // Extraer la parte base (letras + números) del código
+        const match = codigoBase.match(/^([A-Za-z]+\d+)(\d*)$/)
+        if (!match) return codigoBase
+
+        const base = match[1] // ej: "5B01"
+        let numeroActual = parseInt(match[2] || "1") // ej: "1" del "5B011"
+
+        // Obtener todos los códigos existentes que empiecen con la misma base
+        const codigosExistentes = estudiantes
+            .map(est => est.codigo)
+            .filter(codigo => codigo.startsWith(base))
+            .map(codigo => {
+                const numMatch = codigo.match(new RegExp(`^${base}(\\d+)$`))
+                return numMatch ? parseInt(numMatch[1]) : 0
+            })
+            .sort((a, b) => a - b)
+
+        // Encontrar el primer número disponible
+        let siguienteNumero = 1
+        for (const num of codigosExistentes) {
+            if (num === siguienteNumero) {
+                siguienteNumero++
+            } else {
+                break
+            }
+        }
+
+        return `${base}${siguienteNumero.toString().padStart(match[2]?.length || 1, '0')}`
     }
 
     const handleAddStudent = () => {
         if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) return
 
         try {
+            let codigoFinal = studentForm.codigo.trim()
+
+            // Verificar si el código ya existe
+            const codigoExiste = estudiantes.some(est => est.codigo === codigoFinal)
+            if (codigoExiste) {
+                // Generar automáticamente el siguiente código disponible
+                codigoFinal = generarSiguienteCodigo(codigoFinal)
+                mostrarEstadoGuardado(`📝 Código actualizado automáticamente: ${codigoFinal}`)
+            }
+
             const nuevoEstudiante = {
                 nombre: studentForm.nombre.trim(),
-                codigo: studentForm.codigo.trim()
+                codigo: codigoFinal
             }
 
             const estudianteGuardado = db.guardarEstudiante(nuevoEstudiante)
-            setEstudiantes(prev => [...prev, estudianteGuardado])
+            setEstudiantes(prev => [...prev, estudianteGuardado].sort((a, b) => a.codigo.localeCompare(b.codigo)))
             setStudentForm({ nombre: '', codigo: '' })
             setShowAddStudentModal(false)
             console.log('✅ Estudiante agregado:', estudianteGuardado)
+            mostrarEstadoGuardado(`✅ Estudiante agregado: ${estudianteGuardado.codigo}`)
         } catch (error) {
             console.error('❌ Error agregando estudiante:', error)
             alert('Error al agregar el estudiante')
@@ -211,13 +301,16 @@ export default function Materias() {
         const tipoNotaId = Date.now()
         const titulo = tipoNotaForm.titulo.trim()
 
-        // Registrar el tipo de nota para este período
+        // Registrar el tipo de nota para esta materia y período específico
         setTiposNotaPeriodo(prev => ({
             ...prev,
-            [selectedPeriodo]: [
-                ...(prev[selectedPeriodo] || []),
-                { id: tipoNotaId, titulo: titulo, descripcion: tipoNotaForm.descripcion.trim() }
-            ]
+            [selectedMateria.id]: {
+                ...prev[selectedMateria.id],
+                [selectedPeriodo]: [
+                    ...(prev[selectedMateria.id]?.[selectedPeriodo] || []),
+                    { id: tipoNotaId, titulo: titulo, descripcion: tipoNotaForm.descripcion.trim() }
+                ]
+            }
         }))
 
         setTipoNotaForm({ titulo: '', descripcion: '' })
@@ -225,10 +318,21 @@ export default function Materias() {
     }
 
     const agregarNotaIndividual = (estudianteId, tipoNotaId, valor) => {
-        if (!valor || valor === '' || valor === 0) return
+        // Si el valor está vacío, borrar la nota
+        if (valor === '' || valor === null || valor === undefined) {
+            borrarNotaIndividual(estudianteId, tipoNotaId)
+            return
+        }
+
+        // Validar que el valor esté entre 1 y 5
+        const nota = parseFloat(valor)
+        if (isNaN(nota) || nota <= 0 || nota > 5) {
+            mostrarEstadoGuardado('❌ La nota debe estar entre 1.0 y 5.0')
+            return
+        }
 
         const periodoKey = `periodo${selectedPeriodo}`
-        const tipoNota = tiposNotaPeriodo[selectedPeriodo]?.find(t => t.id === tipoNotaId)
+        const tipoNota = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo]?.find(t => t.id === tipoNotaId)
         if (!tipoNota) return
 
         // Guardar en la base de datos inmediatamente
@@ -239,7 +343,7 @@ export default function Materias() {
                 selectedPeriodo,
                 tipoNotaId,
                 tipoNota.titulo,
-                valor
+                nota
             )
         } catch (error) {
             console.error('Error guardando nota en BD:', error)
@@ -257,7 +361,7 @@ export default function Materias() {
 
             if (notaExistente) {
                 // Actualizar nota existente
-                notaExistente.valor = parseFloat(valor)
+                notaExistente.valor = nota
                 notaExistente.updated_at = new Date().toISOString()
             } else {
                 // Agregar nueva nota
@@ -265,7 +369,7 @@ export default function Materias() {
                     id: Date.now() + estudianteId,
                     tipoId: tipoNotaId,
                     titulo: tipoNota.titulo,
-                    valor: parseFloat(valor),
+                    valor: nota,
                     fecha: new Date().toISOString().split('T')[0],
                     created_at: new Date().toISOString()
                 })
@@ -275,8 +379,45 @@ export default function Materias() {
         })
 
         // Mostrar confirmación visual
-        console.log(`✅ Nota guardada: ${tipoNota.titulo} = ${valor}`)
-        mostrarEstadoGuardado(`✅ Guardado: ${tipoNota.titulo} = ${valor}`)
+        console.log(`✅ Nota guardada: ${tipoNota.titulo} = ${nota}`)
+        mostrarEstadoGuardado(`✅ Guardado: ${tipoNota.titulo} = ${nota}`)
+    }
+
+    const borrarNotaIndividual = (estudianteId, tipoNotaId) => {
+        const periodoKey = `periodo${selectedPeriodo}`
+        const tipoNota = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo]?.find(t => t.id === tipoNotaId)
+        if (!tipoNota) return
+
+        // Eliminar de la base de datos usando el método correcto
+        try {
+            db.eliminarNotaIndividual(
+                selectedMateria.id,
+                estudianteId,
+                selectedPeriodo,
+                tipoNotaId
+            )
+        } catch (error) {
+            console.error('Error eliminando nota de BD:', error)
+        }
+
+        setNotas(prev => {
+            const nuevasNotas = { ...prev }
+
+            if (nuevasNotas[selectedMateria.id] &&
+                nuevasNotas[selectedMateria.id][estudianteId] &&
+                nuevasNotas[selectedMateria.id][estudianteId][periodoKey]) {
+
+                // Filtrar la nota específica
+                nuevasNotas[selectedMateria.id][estudianteId][periodoKey] =
+                    nuevasNotas[selectedMateria.id][estudianteId][periodoKey].filter(n => n.tipoId !== tipoNotaId)
+            }
+
+            return nuevasNotas
+        })
+
+        // Mostrar confirmación visual
+        console.log(`🗑️ Nota eliminada: ${tipoNota.titulo}`)
+        mostrarEstadoGuardado(`🗑️ Eliminado: ${tipoNota.titulo}`)
     }
 
     const obtenerNotaPorTipo = (estudianteId, tipoNotaId) => {
@@ -298,21 +439,27 @@ export default function Materias() {
     }
 
     const eliminarTipoNota = (tipoNotaId) => {
+        // Eliminar el tipo de nota solo de la materia actual
         setTiposNotaPeriodo(prev => ({
             ...prev,
-            [selectedPeriodo]: prev[selectedPeriodo]?.filter(t => t.id !== tipoNotaId) || []
+            [selectedMateria.id]: {
+                ...prev[selectedMateria.id],
+                [selectedPeriodo]: prev[selectedMateria.id]?.[selectedPeriodo]?.filter(t => t.id !== tipoNotaId) || []
+            }
         }))
 
-        // También eliminar las notas asociadas
+        // También eliminar las notas asociadas SOLO de la materia actual
         setNotas(prev => {
             const nuevasNotas = { ...prev }
-            Object.keys(nuevasNotas).forEach(materiaId => {
-                Object.keys(nuevasNotas[materiaId]).forEach(estudianteId => {
-                    Object.keys(nuevasNotas[materiaId][estudianteId]).forEach(periodoKey => {
-                        nuevasNotas[materiaId][estudianteId][periodoKey] = nuevasNotas[materiaId][estudianteId][periodoKey].filter(n => n.tipoId !== tipoNotaId)
-                    })
+            if (nuevasNotas[selectedMateria.id]) {
+                Object.keys(nuevasNotas[selectedMateria.id]).forEach(estudianteId => {
+                    const periodoKey = `periodo${selectedPeriodo}`
+                    if (nuevasNotas[selectedMateria.id][estudianteId]?.[periodoKey]) {
+                        nuevasNotas[selectedMateria.id][estudianteId][periodoKey] =
+                            nuevasNotas[selectedMateria.id][estudianteId][periodoKey].filter(n => n.tipoId !== tipoNotaId)
+                    }
                 })
-            })
+            }
             return nuevasNotas
         })
     }
@@ -380,7 +527,7 @@ export default function Materias() {
         datosHoja.push([]) // Fila vacía
 
         // Obtener todas las actividades del período seleccionado
-        const tiposActividad = tiposNotaPeriodo[selectedPeriodo] || []
+        const tiposActividad = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
         const nombresPeriodos = ['Período 1', 'Período 2', 'Período 3', 'Período 4']
 
         if (tiposActividad.length > 0) {
@@ -589,7 +736,7 @@ export default function Materias() {
 
                     {/* Tabla de notas */}
                     <div className="p-4 md:p-6">
-                        {(tiposNotaPeriodo[selectedPeriodo] || []).length === 0 ? (
+                        {(tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []).length === 0 ? (
                             <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
                                 <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400" />
                                 <h3 className="mt-2 text-lg font-medium text-gray-900">No hay tipos de nota creados</h3>
@@ -617,7 +764,7 @@ export default function Materias() {
                                                     Código
                                                 </th>
                                                 {/* Columnas dinámicas para cada tipo de nota */}
-                                                {(tiposNotaPeriodo[selectedPeriodo] || []).map((tipo) => (
+                                                {(tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []).map((tipo) => (
                                                     <th key={tipo.id} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                         <div className="flex items-center justify-center gap-1">
                                                             <span>{tipo.titulo}</span>
@@ -653,7 +800,7 @@ export default function Materias() {
                                                             <div className="text-sm text-gray-500">{estudiante.codigo}</div>
                                                         </td>
                                                         {/* Celdas para cada tipo de nota */}
-                                                        {(tiposNotaPeriodo[selectedPeriodo] || []).map((tipo) => {
+                                                        {(tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []).map((tipo) => {
                                                             const notaActual = obtenerNotaPorTipo(estudiante.id, tipo.id)
                                                             return (
                                                                 <td key={tipo.id} className="px-3 py-4 whitespace-nowrap text-center">

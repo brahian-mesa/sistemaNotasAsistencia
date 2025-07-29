@@ -839,6 +839,43 @@ class LocalDatabase {
     }
   }
 
+  // ===== ELIMINAR NOTA INDIVIDUAL =====
+  eliminarNotaIndividual(materiaId, estudianteId, periodo, tipoNotaId) {
+    try {
+      const notasDetalladas = this.getNotasDetalladas();
+
+      // Verificar que exista la estructura
+      if (!notasDetalladas[materiaId] ||
+          !notasDetalladas[materiaId][estudianteId] ||
+          !notasDetalladas[materiaId][estudianteId][`periodo${periodo}`]) {
+        console.log(`⚠️ No se encontraron notas para eliminar`);
+        return false;
+      }
+
+      const periodoKey = `periodo${periodo}`;
+      const notasPeriodo = notasDetalladas[materiaId][estudianteId][periodoKey];
+
+      // Filtrar la nota específica
+      const notasOriginal = notasPeriodo.length;
+      notasDetalladas[materiaId][estudianteId][periodoKey] = 
+        notasPeriodo.filter(n => n.tipoId !== tipoNotaId);
+
+      const notasFinal = notasDetalladas[materiaId][estudianteId][periodoKey].length;
+
+      if (notasOriginal > notasFinal) {
+        this.guardarNotasDetalladas(notasDetalladas);
+        console.log(`✅ Nota individual eliminada para estudiante ${estudianteId}, tipo ${tipoNotaId}`);
+        return true;
+      } else {
+        console.log(`⚠️ No se encontró la nota para eliminar`);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error eliminando nota individual:", error);
+      throw error;
+    }
+  }
+
   // ===== NOTAS PERSONALES =====
   getNotasPersonales() {
     try {

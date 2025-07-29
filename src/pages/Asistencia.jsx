@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ChevronDownIcon, ChevronUpIcon, UserGroupIcon, CalendarIcon, ChartBarIcon } from '@heroicons/react/24/outline'
+import { ChevronDownIcon, ChevronUpIcon, UserGroupIcon, CalendarIcon, ChartBarIcon, UserPlusIcon } from '@heroicons/react/24/outline'
 import PageContainer from '../components/PageContainer'
 import * as XLSX from 'xlsx'
 import db from '../utils/database'
@@ -14,6 +14,13 @@ export default function Asistencia() {
     const [materias, setMaterias] = useState([])
     const [estudiantes, setEstudiantes] = useState([])
 
+    // Estados para modal de agregar estudiante
+    const [showAddStudentModal, setShowAddStudentModal] = useState(false)
+    const [studentForm, setStudentForm] = useState({
+        nombre: '',
+        codigo: ''
+    })
+
     // Estados para indicador de guardado automático
     const [autoSaveStatus, setAutoSaveStatus] = useState('')
 
@@ -21,6 +28,70 @@ export default function Asistencia() {
     const mostrarEstadoGuardado = (mensaje) => {
         setAutoSaveStatus(mensaje)
         setTimeout(() => setAutoSaveStatus(''), 2000)
+    }
+
+    // Función para generar el siguiente código disponible (igual que en Materias)
+    const generarSiguienteCodigo = (codigoBase) => {
+        // Extraer la parte base (letras + números) del código
+        const match = codigoBase.match(/^([A-Za-z]+\d+)(\d*)$/)
+        if (!match) return codigoBase
+
+        const base = match[1] // ej: "5B01"
+        let numeroActual = parseInt(match[2] || "1") // ej: "1" del "5B011"
+
+        // Obtener todos los códigos existentes que empiecen con la misma base
+        const codigosExistentes = estudiantes
+            .map(est => est.codigo)
+            .filter(codigo => codigo.startsWith(base))
+            .map(codigo => {
+                const numMatch = codigo.match(new RegExp(`^${base}(\\d+)$`))
+                return numMatch ? parseInt(numMatch[1]) : 0
+            })
+            .sort((a, b) => a - b)
+
+        // Encontrar el primer número disponible
+        let siguienteNumero = 1
+        for (const num of codigosExistentes) {
+            if (num === siguienteNumero) {
+                siguienteNumero++
+            } else {
+                break
+            }
+        }
+
+        return `${base}${siguienteNumero.toString().padStart(match[2]?.length || 1, '0')}`
+    }
+
+    // Función para agregar estudiante (igual que en Materias)
+    const handleAddStudent = () => {
+        if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) return
+
+        try {
+            let codigoFinal = studentForm.codigo.trim()
+
+            // Verificar si el código ya existe
+            const codigoExiste = estudiantes.some(est => est.codigo === codigoFinal)
+            if (codigoExiste) {
+                // Generar automáticamente el siguiente código disponible
+                codigoFinal = generarSiguienteCodigo(codigoFinal)
+                mostrarEstadoGuardado(`📝 Código actualizado automáticamente: ${codigoFinal}`)
+            }
+
+            const nuevoEstudiante = {
+                nombre: studentForm.nombre.trim(),
+                codigo: codigoFinal
+            }
+
+            const estudianteGuardado = db.guardarEstudiante(nuevoEstudiante)
+            setEstudiantes(prev => [...prev, estudianteGuardado].sort((a, b) => a.codigo.localeCompare(b.codigo)))
+            setStudentForm({ nombre: '', codigo: '' })
+            setShowAddStudentModal(false)
+            console.log('✅ Estudiante agregado:', estudianteGuardado)
+            mostrarEstadoGuardado(`✅ Estudiante agregado: ${estudianteGuardado.codigo}`)
+        } catch (error) {
+            console.error('❌ Error agregando estudiante:', error)
+            alert('Error al agregar el estudiante')
+        }
     }
 
     // Cargar datos al inicializar - igual que en Materias
@@ -34,7 +105,8 @@ export default function Asistencia() {
             const estudiantesDB = db.getEstudiantes()
 
             setMaterias(materiasDB)
-            setEstudiantes(estudiantesDB)
+            // Ordenar estudiantes por código automáticamente
+            setEstudiantes(estudiantesDB.sort((a, b) => a.codigo.localeCompare(b.codigo)))
 
             console.log('✅ Datos cargados desde la base de datos:')
             console.log('📚 Materias:', materiasDB.length)
@@ -351,6 +423,13 @@ export default function Asistencia() {
                                     Registro de Asistencia
                                 </h2>
                             </div>
+                            <button
+                                onClick={() => setShowAddStudentModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                            >
+                                <UserPlusIcon className="h-5 w-5" />
+                                Agregar Estudiante
+                            </button>
                         </div>
 
                         <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
@@ -543,6 +622,61 @@ export default function Asistencia() {
                                     })}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal Agregar Estudiante */}
+                {showAddStudentModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4">Agregar Nuevo Estudiante</h3>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Nombre del estudiante
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={studentForm.nombre}
+                                        onChange={(e) => setStudentForm(prev => ({ ...prev, nombre: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                        placeholder="Ej: María González"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Código del estudiante
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={studentForm.codigo}
+                                        onChange={(e) => setStudentForm(prev => ({ ...prev, codigo: e.target.value }))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                        placeholder="Ej: 5B011"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button
+                                    onClick={() => {
+                                        setShowAddStudentModal(false)
+                                        setStudentForm({ nombre: '', codigo: '' })
+                                    }}
+                                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleAddStudent}
+                                    className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                                >
+                                    Agregar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

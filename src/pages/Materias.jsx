@@ -185,20 +185,63 @@ export default function Materias() {
         }
     }
 
+    // Función para generar el siguiente código disponible
+    const generarSiguienteCodigo = (codigoBase) => {
+        // Extraer la parte base (letras + números) del código
+        const match = codigoBase.match(/^([A-Za-z]+\d+)(\d*)$/)
+        if (!match) return codigoBase
+
+        const base = match[1] // ej: "5B01"
+        let numeroActual = parseInt(match[2] || "1") // ej: "1" del "5B011"
+
+        // Obtener todos los códigos existentes que empiecen con la misma base
+        const codigosExistentes = estudiantes
+            .map(est => est.codigo)
+            .filter(codigo => codigo.startsWith(base))
+            .map(codigo => {
+                const numMatch = codigo.match(new RegExp(`^${base}(\\d+)$`))
+                return numMatch ? parseInt(numMatch[1]) : 0
+            })
+            .sort((a, b) => a - b)
+
+        // Encontrar el primer número disponible
+        let siguienteNumero = 1
+        for (const num of codigosExistentes) {
+            if (num === siguienteNumero) {
+                siguienteNumero++
+            } else {
+                break
+            }
+        }
+
+        return `${base}${siguienteNumero.toString().padStart(match[2]?.length || 1, '0')}`
+    }
+
     const handleAddStudent = () => {
         if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) return
 
         try {
+            let codigoFinal = studentForm.codigo.trim()
+
+            // Verificar si el código ya existe
+            const codigoExiste = estudiantes.some(est => est.codigo === codigoFinal)
+            if (codigoExiste) {
+                // Generar automáticamente el siguiente código disponible
+                codigoFinal = generarSiguienteCodigo(codigoFinal)
+                mostrarEstadoGuardado(`📝 Código actualizado automáticamente: ${codigoFinal}`)
+            }
+
             const nuevoEstudiante = {
                 nombre: studentForm.nombre.trim(),
-                codigo: studentForm.codigo.trim()
+                codigo: codigoFinal
             }
 
             const estudianteGuardado = db.guardarEstudiante(nuevoEstudiante)
-            setEstudiantes(prev => [...prev, estudianteGuardado])
+            setEstudiantes(prev => [...prev, estudianteGuardado].sort((a, b) => a.codigo.localeCompare(b.codigo)))
             setStudentForm({ nombre: '', codigo: '' })
             setShowAddStudentModal(false)
             console.log('✅ Estudiante agregado:', estudianteGuardado)
+            mostrarEstadoGuardado(`✅ Estudiante agregado: ${estudianteGuardado.codigo}`)
         } catch (error) {
             console.error('❌ Error agregando estudiante:', error)
             alert('Error al agregar el estudiante')
@@ -225,7 +268,18 @@ export default function Materias() {
     }
 
     const agregarNotaIndividual = (estudianteId, tipoNotaId, valor) => {
-        if (!valor || valor === '' || valor === 0) return
+        // Si el valor está vacío, borrar la nota
+        if (valor === '' || valor === null || valor === undefined) {
+            borrarNotaIndividual(estudianteId, tipoNotaId)
+            return
+        }
+
+        // Validar que el valor esté entre 1 y 5
+        const nota = parseFloat(valor)
+        if (isNaN(nota) || nota <= 0 || nota > 5) {
+            mostrarEstadoGuardado('❌ La nota debe estar entre 1.0 y 5.0')
+            return
+        }
 
         const periodoKey = `periodo${selectedPeriodo}`
         const tipoNota = tiposNotaPeriodo[selectedPeriodo]?.find(t => t.id === tipoNotaId)
@@ -239,7 +293,7 @@ export default function Materias() {
                 selectedPeriodo,
                 tipoNotaId,
                 tipoNota.titulo,
-                valor
+                nota
             )
         } catch (error) {
             console.error('Error guardando nota en BD:', error)
@@ -257,7 +311,7 @@ export default function Materias() {
 
             if (notaExistente) {
                 // Actualizar nota existente
-                notaExistente.valor = parseFloat(valor)
+                notaExistente.valor = nota
                 notaExistente.updated_at = new Date().toISOString()
             } else {
                 // Agregar nueva nota
@@ -265,7 +319,7 @@ export default function Materias() {
                     id: Date.now() + estudianteId,
                     tipoId: tipoNotaId,
                     titulo: tipoNota.titulo,
-                    valor: parseFloat(valor),
+                    valor: nota,
                     fecha: new Date().toISOString().split('T')[0],
                     created_at: new Date().toISOString()
                 })
@@ -275,8 +329,48 @@ export default function Materias() {
         })
 
         // Mostrar confirmación visual
-        console.log(`✅ Nota guardada: ${tipoNota.titulo} = ${valor}`)
-        mostrarEstadoGuardado(`✅ Guardado: ${tipoNota.titulo} = ${valor}`)
+        console.log(`✅ Nota guardada: ${tipoNota.titulo} = ${nota}`)
+        mostrarEstadoGuardado(`✅ Guardado: ${tipoNota.titulo} = ${nota}`)
+    }
+
+    const borrarNotaIndividual = (estudianteId, tipoNotaId) => {
+        const periodoKey = `periodo${selectedPeriodo}`
+        const tipoNota = tiposNotaPeriodo[selectedPeriodo]?.find(t => t.id === tipoNotaId)
+        if (!tipoNota) return
+
+        // Eliminar de la base de datos
+        try {
+            // Eliminar de las notas guardadas
+            const notasDB = JSON.parse(localStorage.getItem('sistema_escolar_notas') || '[]')
+            const notasFiltradas = notasDB.filter(nota =>
+                !(nota.materia_id === selectedMateria.id &&
+                    nota.estudiante_id === estudianteId &&
+                    nota.periodo === selectedPeriodo &&
+                    nota.tipo_nota_id === tipoNotaId)
+            )
+            localStorage.setItem('sistema_escolar_notas', JSON.stringify(notasFiltradas))
+        } catch (error) {
+            console.error('Error eliminando nota de BD:', error)
+        }
+
+        setNotas(prev => {
+            const nuevasNotas = { ...prev }
+
+            if (nuevasNotas[selectedMateria.id] &&
+                nuevasNotas[selectedMateria.id][estudianteId] &&
+                nuevasNotas[selectedMateria.id][estudianteId][periodoKey]) {
+
+                // Filtrar la nota específica
+                nuevasNotas[selectedMateria.id][estudianteId][periodoKey] =
+                    nuevasNotas[selectedMateria.id][estudianteId][periodoKey].filter(n => n.tipoId !== tipoNotaId)
+            }
+
+            return nuevasNotas
+        })
+
+        // Mostrar confirmación visual
+        console.log(`🗑️ Nota eliminada: ${tipoNota.titulo}`)
+        mostrarEstadoGuardado(`🗑️ Eliminado: ${tipoNota.titulo}`)
     }
 
     const obtenerNotaPorTipo = (estudianteId, tipoNotaId) => {

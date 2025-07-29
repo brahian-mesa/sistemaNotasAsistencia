@@ -17,7 +17,7 @@ export default function Materias() {
         // Inicializar con el período académico actual
         const hoy = new Date()
         const fechaHoy = hoy.toISOString().split('T')[0]
-        
+
         // Definición temporal para la inicialización
         const periodos = {
             1: { fechaInicio: '2025-01-27', fechaFin: '2025-04-04' },
@@ -25,14 +25,14 @@ export default function Materias() {
             3: { fechaInicio: '2025-07-07', fechaFin: '2025-09-12' },
             4: { fechaInicio: '2025-09-15', fechaFin: '2025-11-28' }
         }
-        
+
         for (let periodo = 1; periodo <= 4; periodo++) {
             const { fechaInicio, fechaFin } = periodos[periodo]
             if (fechaHoy >= fechaInicio && fechaHoy <= fechaFin) {
                 return periodo
             }
         }
-        
+
         return 1 // Por defecto, período 1
     })
     const [showAddTipoNotaModal, setShowAddTipoNotaModal] = useState(false)
@@ -56,29 +56,29 @@ export default function Materias() {
 
     // Definición de períodos académicos con fechas específicas
     const periodosAcademicos = {
-        1: { 
-            nombre: 'Período 1', 
-            fechaInicio: '2025-01-27', 
+        1: {
+            nombre: 'Período 1',
+            fechaInicio: '2025-01-27',
             fechaFin: '2025-04-04',
-            descripcion: '27 Ene - 4 Abr' 
+            descripcion: '27 Ene - 4 Abr'
         },
-        2: { 
-            nombre: 'Período 2', 
-            fechaInicio: '2025-04-07', 
+        2: {
+            nombre: 'Período 2',
+            fechaInicio: '2025-04-07',
             fechaFin: '2025-06-16',
-            descripcion: '7 Abr - 16 Jun' 
+            descripcion: '7 Abr - 16 Jun'
         },
-        3: { 
-            nombre: 'Período 3', 
-            fechaInicio: '2025-07-07', 
+        3: {
+            nombre: 'Período 3',
+            fechaInicio: '2025-07-07',
             fechaFin: '2025-09-12',
-            descripcion: '7 Jul - 12 Sep' 
+            descripcion: '7 Jul - 12 Sep'
         },
-        4: { 
-            nombre: 'Período 4', 
-            fechaInicio: '2025-09-15', 
+        4: {
+            nombre: 'Período 4',
+            fechaInicio: '2025-09-15',
             fechaFin: '2025-11-28',
-            descripcion: '15 Sep - 28 Nov' 
+            descripcion: '15 Sep - 28 Nov'
         }
     }
 
@@ -86,14 +86,14 @@ export default function Materias() {
     const obtenerPeriodoActual = () => {
         const hoy = new Date()
         const fechaHoy = hoy.toISOString().split('T')[0] // Formato YYYY-MM-DD
-        
+
         for (let periodo = 1; periodo <= 4; periodo++) {
             const { fechaInicio, fechaFin } = periodosAcademicos[periodo]
             if (fechaHoy >= fechaInicio && fechaHoy <= fechaFin) {
                 return periodo
             }
         }
-        
+
         // Si no está en ningún período, determinar el más cercano
         for (let periodo = 1; periodo <= 4; periodo++) {
             const { fechaInicio } = periodosAcademicos[periodo]
@@ -101,7 +101,7 @@ export default function Materias() {
                 return periodo
             }
         }
-        
+
         return 1 // Por defecto, período 1
     }
 
@@ -638,8 +638,8 @@ export default function Materias() {
             })
         } else {
             // Si no hay actividades, mostrar solo promedios por período
-            const encabezados = ['Estudiante', 
-                ...Object.values(periodosAcademicos).map(p => `${p.nombre} (${p.descripcion})`), 
+            const encabezados = ['Estudiante',
+                ...Object.values(periodosAcademicos).map(p => `${p.nombre} (${p.descripcion})`),
                 'Promedio General'
             ]
             datosHoja.push(encabezados)

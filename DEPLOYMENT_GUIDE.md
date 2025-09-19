@@ -118,6 +118,18 @@ echo $VITE_SUPABASE_ANON_KEY
 ```
 
 ### Limpiar y Reinstalar Dependencias
+
+**Para Windows (PowerShell):**
+```powershell
+.\fix-dependencies.ps1
+```
+
+**Para Windows (CMD):**
+```cmd
+fix-dependencies.bat
+```
+
+**Para Linux/Mac:**
 ```bash
 ./fix-dependencies.sh
 ```

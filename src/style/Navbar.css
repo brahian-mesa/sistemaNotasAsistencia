@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --color-primario: #CD9FFF; /* Tu color morado original */
@@ -240,7 +242,12 @@
 .indigo {
   --color-primario: #6366F1;
   --color-secundario: #818CF8;
-  --color-terciario/* Cyan theme */
+  --color-terciario: #A5B4FC;
+  --color-cuarto: #E0E7FF;
+  --boton-House: #4F46E5;
+}
+
+/* Cyan theme */
 .cyan {
   --color-primario: #06B6D4;
   --color-secundario: #67E8F9;
@@ -399,18 +406,4 @@ html {
 /* Efecto de neón */
 .neon {
   text-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor;
-}color-terciario: #FCD34D;
-  --color-cuarto: #FEF3C7;
-  --boton-House: #D97706;
 }
-
-/* Cyan theme */
-.cyan {
-  --color-primario: #06B6D4;
-  --color-secundario: #67E8F9;
-  --color-terciario: #A5F3FC;
-  --color-cuarto: #CFFAFE;
-  --boton-House: #0891B2;
-}
-
- 

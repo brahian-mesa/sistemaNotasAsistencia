@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🔧 Solucionando problemas de dependencias..."
+echo "🔧 Solucionando problemas de dependencias y CSS..."
 
 # Limpiar node_modules y package-lock.json
 echo "🧹 Limpiando dependencias anteriores..."

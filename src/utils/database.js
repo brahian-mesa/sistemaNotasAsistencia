@@ -239,7 +239,7 @@ class LocalDatabase {
       const currentUser = this.getCurrentUser();
 
       const { data, error } = await supabase
-        .from("asistencia")
+        .from("asistencias")
         .select(
           `
           *,
@@ -264,7 +264,7 @@ class LocalDatabase {
       const currentUser = this.getCurrentUser();
 
       const { data, error } = await supabase
-        .from("asistencia")
+        .from("asistencias")
         .select("*")
         .eq("usuario_id", currentUser?.id)
         .order("fecha", { ascending: false });
@@ -282,7 +282,7 @@ class LocalDatabase {
       const currentUser = this.getCurrentUser();
 
       const { data, error } = await supabase
-        .from("asistencia")
+        .from("asistencias")
         .insert({
           ...asistencia,
           usuario_id: currentUser?.id || null,
@@ -305,7 +305,7 @@ class LocalDatabase {
 
       // Eliminar asistencias existentes para esa fecha y usuario
       await supabase
-        .from("asistencia")
+        .from("asistencias")
         .delete()
         .eq("fecha", fecha)
         .eq("usuario_id", currentUser?.id);
@@ -323,7 +323,7 @@ class LocalDatabase {
       console.log("🔍 Datos a insertar:", nuevasAsistencias);
 
       const { data, error } = await supabase
-        .from("asistencia")
+        .from("asistencias")
         .insert(nuevasAsistencias)
         .select();
 
@@ -346,10 +346,46 @@ class LocalDatabase {
     }
   }
 
+  async guardarAsistenciaIndividual(estudianteId, materiaId, fecha, estado) {
+    try {
+      const currentUser = this.getCurrentUser();
+
+      // Primero eliminar asistencia existente para esta combinación
+      await supabase
+        .from("asistencias")
+        .delete()
+        .eq("estudiante_id", estudianteId)
+        .eq("materia_id", materiaId)
+        .eq("fecha", fecha)
+        .eq("usuario_id", currentUser?.id);
+
+      // Insertar nueva asistencia
+      const { data, error } = await supabase
+        .from("asistencias")
+        .insert({
+          estudiante_id: estudianteId,
+          materia_id: materiaId,
+          usuario_id: currentUser?.id || null,
+          fecha: fecha,
+          estado: estado,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      console.log(`✅ Asistencia individual guardada: Estudiante ${estudianteId}, Materia ${materiaId}, Estado: ${estado}`);
+      return data;
+    } catch (error) {
+      console.error("Error guardando asistencia individual:", error);
+      throw error;
+    }
+  }
+
   async getAsistenciaEstudiante(estudianteId, fecha) {
     try {
       const { data, error } = await supabase
-        .from("asistencia")
+        .from("asistencias")
         .select("estado")
         .eq("estudiante_id", estudianteId)
         .eq("fecha", fecha)
@@ -1005,7 +1041,7 @@ class LocalDatabase {
       const currentUser = this.getCurrentUser();
 
       const { data, error } = await supabase
-        .from("asistencia")
+        .from("asistencias")
         .select(
           `
           estudiante_id,
@@ -1098,7 +1134,7 @@ class LocalDatabase {
   async eliminarAsistencia(id) {
     try {
       const { error } = await supabase
-        .from("asistencia")
+        .from("asistencias")
         .delete()
         .eq("id", id);
 

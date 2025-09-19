@@ -2206,28 +2206,7 @@ export default function Materias() {
                     </div>
                 </div>
 
-                {/* Información sobre materias */}
-                <div className="p-4 md:p-6 border-b border-gray-100">
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                            <div className="p-2 bg-green-100 rounded-lg">
-                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-semibold text-green-800 mb-2">Tus Materias Personalizadas</h3>
-                                <div className="space-y-2 text-sm text-green-700">
-                                    <p><span className="font-medium">🟢 Solo tus materias:</span> Aquí se muestran únicamente las materias que has agregado para tu grado.</p>
-                                    <p><span className="font-medium">💾 Datos persistentes:</span> Todas las materias, estudiantes y notas se guardan automáticamente en la base de datos Supabase.</p>
-                                    <p className="text-xs text-green-600 mt-2">
-                                        Agrega nuevas materias usando el botón "Agregar Materia" y estas se asociarán automáticamente a tu grado ({auth.getCurrentUser()?.grado || 'Sin especificar'}).
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                
 
                 {/* Tabla de materias */}
                 <div className="p-4 md:p-6">

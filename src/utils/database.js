@@ -1,481 +1,136 @@
-// Sistema de base de datos simulada usando localStorage para el navegador
+// Sistema de base de datos simple usando solo Supabase
+import supabase from "./supabase";
+import auth from "./auth";
+
 class LocalDatabase {
   constructor() {
     this.dbName = "sistema_escolar";
     this.initDatabase();
   }
 
-  initDatabase() {
+  // Obtener usuario actual
+  getCurrentUser() {
+    return auth.getCurrentUser();
+  }
+
+  async initDatabase() {
     try {
-      // Crear estructura de datos si no existe
-      if (!localStorage.getItem(`${this.dbName}_initialized`)) {
-        this.createTables();
-        this.insertDefaultData();
-        localStorage.setItem(`${this.dbName}_initialized`, "true");
-        console.log("✅ Base de datos local inicializada correctamente");
+      console.log("🔄 Inicializando base de datos Supabase...");
+      const connected = await this.testConnection();
+      if (connected) {
+        console.log("✅ Base de datos Supabase conectada correctamente");
       } else {
-        console.log("✅ Base de datos local ya existe");
+        console.log("❌ Error conectando a Supabase");
       }
     } catch (error) {
       console.error("❌ Error inicializando base de datos:", error);
     }
   }
 
-  createTables() {
-    // Crear estructura de datos en localStorage
-    const tables = {
-      estudiantes: [],
-      materias: [],
-      asistencias: [],
-      notas: [],
-      notas_personales: [],
-    };
-
-    Object.keys(tables).forEach((table) => {
-      localStorage.setItem(
-        `${this.dbName}_${table}`,
-        JSON.stringify(tables[table])
-      );
-    });
-  }
-
-  insertDefaultData() {
-    // Insertar estudiantes por defecto
-    const estudiantesDefault = [
-      {
-        id: 1,
-        nombre: "Agudelo Grisales Juan Sebastian",
-        codigo: "S5B001",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 2,
-        nombre: "Andara Gimenez Alessandra de los",
-        codigo: "S5B002",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 3,
-        nombre: "Aricapa Velasquez Yahir Santiago",
-        codigo: "S5B003",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 4,
-        nombre: "Betancourth Garcia Isabella",
-        codigo: "S5B004",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 5,
-        nombre: "Calvo Becerra Yoselin Valeria",
-        codigo: "S5B005",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 6,
-        nombre: "Cardona Munera Luciana",
-        codigo: "S5B006",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 7,
-        nombre: "Cardona Guevara Jhojan Esneider",
-        codigo: "S5B007",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 8,
-        nombre: "Ceballos Ladino Nycoll",
-        codigo: "S5B008",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 9,
-        nombre: "Clavijo Trujillo Juan Manuel",
-        codigo: "S5B009",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 10,
-        nombre: "FLER",
-        codigo: "S5B010",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 11,
-        nombre: "Duque Carrillo Maria José",
-        codigo: "S5B011",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 12,
-        nombre: "Franco Ramirez Luis Esteban",
-        codigo: "S5B012",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 13,
-        nombre: "Galan Ramirez Gerónimo",
-        codigo: "S5B013",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 14,
-        nombre: "EMANUEL",
-        codigo: "S5B014",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 15,
-        nombre: "BRITHANI",
-        codigo: "S5B015",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 16,
-        nombre: "Guapacha Montoya Felipe",
-        codigo: "S5B016",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 17,
-        nombre: "Guapacha Montoya Stiven",
-        codigo: "S5B017",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 18,
-        nombre: "Guevara Batero Valery",
-        codigo: "S5B018",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 19,
-        nombre: "Jimenez Aricapa Johan Andrés",
-        codigo: "S5B019",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 20,
-        nombre: "Ladino Contreras Emanuel",
-        codigo: "S5B020",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 21,
-        nombre: "Ladino Bartolo Lun Julian",
-        codigo: "S5B021",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 22,
-        nombre: "Ladino Contreras Antwon",
-        codigo: "S5B022",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 23,
-        nombre: "Ladino Diaz Yeferson",
-        codigo: "S5B023",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 24,
-        nombre: "Ladino Pinto Valeria",
-        codigo: "S5B024",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 25,
-        nombre: "León Zuluaga Alan Santiago",
-        codigo: "S5B025",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 26,
-        nombre: "Manzo Hernández Alan Manuel",
-        codigo: "S5B026",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 27,
-        nombre: "Melchor Senna Ismael",
-        codigo: "S5B027",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 28,
-        nombre: "Molina Marin Jhonier",
-        codigo: "S5B028",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 29,
-        nombre: "Mosquera Hincapie Eileen",
-        codigo: "S5B029",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 30,
-        nombre: "Ortíz Ladino Sebastian",
-        codigo: "S5B030",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 31,
-        nombre: "Rendón Tapasco Jackelin",
-        codigo: "S5B031",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 32,
-        nombre: "Reyes Medina Dayron Hjosua",
-        codigo: "S5B032",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 33,
-        nombre: "Robledo muñoz Isabela",
-        codigo: "S5B033",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 34,
-        nombre: "Rodas Ladino Laura Sofia",
-        codigo: "S5B034",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 35,
-        nombre: "Suarez Suarez Sofia",
-        codigo: "S5B035",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 36,
-        nombre: "Tapasco Tapasco Samuel Alejandro",
-        codigo: "S5B036",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 37,
-        nombre: "Toro Velasco Sofia",
-        codigo: "S5B037",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 38,
-        nombre: "Velasco Londoño Emily Sofia",
-        codigo: "S5B038",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 39,
-        nombre: "Zapata Chiquito Luciana",
-        codigo: "S5B039",
-        created_at: new Date().toISOString(),
-      },
-    ];
-
-    localStorage.setItem(
-      `${this.dbName}_estudiantes`,
-      JSON.stringify(estudiantesDefault)
-    );
-
-    // Insertar materias por defecto
-    const materiasDefault = [
-      {
-        id: 1,
-        nombre: "Matemáticas",
-        codigo: "MAT",
-        grado: "5b",
-        horario: "Martes, Jueves",
-        color: "bg-blue-100 text-blue-800 border-blue-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 2,
-        nombre: "Lenguaje",
-        codigo: "LEN",
-        grado: "5b",
-        horario: "Miércoles, Jueves",
-        color: "bg-green-100 text-green-800 border-green-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 3,
-        nombre: "Ciencias Naturales",
-        codigo: "NAT",
-        grado: "5b",
-        horario: "Lunes, Martes, Viernes",
-        color: "bg-emerald-100 text-emerald-800 border-emerald-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 4,
-        nombre: "Ciencias Sociales",
-        codigo: "SOC",
-        grado: "5b",
-        horario: "Lunes, Viernes",
-        color: "bg-orange-100 text-orange-800 border-orange-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 5,
-        nombre: "Inglés",
-        codigo: "ING",
-        grado: "5b",
-        horario: "Martes",
-        color: "bg-purple-100 text-purple-800 border-purple-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 6,
-        nombre: "Educación Física",
-        codigo: "EDF",
-        grado: "5b",
-        horario: "Lunes",
-        color: "bg-red-100 text-red-800 border-red-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 7,
-        nombre: "Geometría",
-        codigo: "GEO",
-        grado: "5b",
-        horario: "Miércoles",
-        color: "bg-blue-100 text-blue-800 border-blue-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 8,
-        nombre: "Educación Artística",
-        codigo: "ART",
-        grado: "5b",
-        horario: "Miércoles",
-        color: "bg-pink-100 text-pink-800 border-pink-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 9,
-        nombre: "Ética y Valores",
-        codigo: "ETI",
-        grado: "5b",
-        horario: "Jueves",
-        color: "bg-yellow-100 text-yellow-800 border-yellow-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 10,
-        nombre: "Educación Cívica",
-        codigo: "CIV",
-        grado: "5b",
-        horario: "Lunes",
-        color: "bg-teal-100 text-teal-800 border-teal-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 11,
-        nombre: "Informática",
-        codigo: "INF",
-        grado: "5b",
-        horario: "Viernes",
-        color: "bg-gray-100 text-gray-800 border-gray-200",
-        created_at: new Date().toISOString(),
-      },
-      {
-        id: 12,
-        nombre: "Educación Religiosa",
-        codigo: "REL",
-        grado: "5b",
-        horario: "Viernes",
-        color: "bg-amber-100 text-amber-800 border-amber-200",
-        created_at: new Date().toISOString(),
-      },
-    ];
-
-    localStorage.setItem(
-      `${this.dbName}_materias`,
-      JSON.stringify(materiasDefault)
-    );
-    console.log("✅ Datos por defecto insertados");
+  async testConnection() {
+    try {
+      const { data, error } = await supabase.from("usuarios").select("count");
+      return !error;
+    } catch (error) {
+      return false;
+    }
   }
 
   // ===== ESTUDIANTES =====
-  getEstudiantes() {
+  async getEstudiantes() {
     try {
-      const data = localStorage.getItem(`${this.dbName}_estudiantes`);
-      return data ? JSON.parse(data) : [];
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("estudiantes")
+        .select("*")
+        .eq("usuario_id", currentUser?.id)
+        .order("codigo")
+        .limit(1000); // Limitar resultados para mejor rendimiento
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error obteniendo estudiantes:", error);
       return [];
     }
   }
 
-  guardarEstudiante(estudiante) {
+  async guardarEstudiante(estudiante) {
     try {
-      const estudiantes = this.getEstudiantes();
-      const newId = Math.max(...estudiantes.map((e) => e.id), 0) + 1;
-      const nuevoEstudiante = {
-        ...estudiante,
-        id: newId,
+      // Obtener usuario actual para establecer relación
+      const currentUser = this.getCurrentUser();
+
+      // Preparar datos del estudiante basándose en la estructura real de la tabla
+      const estudianteData = {
+        nombre: estudiante.nombre?.trim(),
+        codigo: estudiante.codigo?.trim() || "",
+        grado: estudiante.grado || "Sin especificar",
+        usuario_id: currentUser?.id || null,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       };
-      estudiantes.push(nuevoEstudiante);
-      localStorage.setItem(
-        `${this.dbName}_estudiantes`,
-        JSON.stringify(estudiantes)
-      );
-      return nuevoEstudiante;
+
+      // No usar campo apellido - eliminado completamente
+
+      const { data, error } = await supabase
+        .from("estudiantes")
+        .insert(estudianteData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      console.log("✅ Estudiante guardado:", data.nombre);
+      return data;
     } catch (error) {
-      console.error("Error guardando estudiante:", error);
+      console.error("❌ Error guardando estudiante:", error);
       throw error;
     }
   }
 
-  actualizarEstudiante(id, datos) {
+  async actualizarEstudiante(id, datos) {
     try {
-      const estudiantes = this.getEstudiantes();
-      const index = estudiantes.findIndex((e) => e.id === id);
-      if (index !== -1) {
-        estudiantes[index] = {
-          ...estudiantes[index],
+      const { data, error } = await supabase
+        .from("estudiantes")
+        .update({
           ...datos,
           updated_at: new Date().toISOString(),
-        };
-        localStorage.setItem(
-          `${this.dbName}_estudiantes`,
-          JSON.stringify(estudiantes)
-        );
-        return estudiantes[index];
-      }
-      return null;
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error("Error actualizando estudiante:", error);
       throw error;
     }
   }
 
-  eliminarEstudiante(id) {
+  async eliminarEstudiante(id) {
     try {
-      const estudiantes = this.getEstudiantes();
-      const filtered = estudiantes.filter((e) => e.id !== id);
-      localStorage.setItem(
-        `${this.dbName}_estudiantes`,
-        JSON.stringify(filtered)
-      );
+      const { error } = await supabase
+        .from("estudiantes")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
     } catch (error) {
       console.error("Error eliminando estudiante:", error);
       throw error;
     }
   }
 
-  getEstudianteById(id) {
+  async getEstudianteById(id) {
     try {
-      const estudiantes = this.getEstudiantes();
-      return estudiantes.find((e) => e.id === id) || null;
+      const { data, error } = await supabase
+        .from("estudiantes")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error("Error obteniendo estudiante:", error);
       return null;
@@ -483,73 +138,95 @@ class LocalDatabase {
   }
 
   // ===== MATERIAS =====
-  getMaterias() {
+  async getMaterias() {
     try {
-      const data = localStorage.getItem(`${this.dbName}_materias`);
-      return data ? JSON.parse(data) : [];
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("materias")
+        .select("*")
+        .eq("usuario_id", currentUser?.id)
+        .order("nombre");
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error obteniendo materias:", error);
       return [];
     }
   }
 
-  guardarMateria(materia) {
+  async guardarMateria(materia) {
     try {
-      const materias = this.getMaterias();
-      const newId = Math.max(...materias.map((m) => m.id), 0) + 1;
-      const nuevaMateria = {
-        ...materia,
-        id: newId,
+      // Obtener usuario actual para establecer relación
+      const currentUser = this.getCurrentUser();
+
+      const materiaData = {
+        nombre: materia.nombre?.trim(),
+        codigo: materia.codigo?.trim(),
+        grado: materia.grado?.trim(),
+        horario: materia.horario?.trim(),
+        color: materia.color,
+        usuario_id: currentUser?.id || null,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       };
-      materias.push(nuevaMateria);
-      localStorage.setItem(`${this.dbName}_materias`, JSON.stringify(materias));
-      return nuevaMateria;
+
+      const { data, error } = await supabase
+        .from("materias")
+        .insert(materiaData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      console.log("✅ Materia guardada:", data.nombre);
+      return data;
     } catch (error) {
-      console.error("Error guardando materia:", error);
+      console.error("❌ Error guardando materia:", error);
       throw error;
     }
   }
 
-  actualizarMateria(id, datos) {
+  async actualizarMateria(id, datos) {
     try {
-      const materias = this.getMaterias();
-      const index = materias.findIndex((m) => m.id === id);
-      if (index !== -1) {
-        materias[index] = {
-          ...materias[index],
+      const { data, error } = await supabase
+        .from("materias")
+        .update({
           ...datos,
           updated_at: new Date().toISOString(),
-        };
-        localStorage.setItem(
-          `${this.dbName}_materias`,
-          JSON.stringify(materias)
-        );
-        return materias[index];
-      }
-      return null;
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error("Error actualizando materia:", error);
       throw error;
     }
   }
 
-  eliminarMateria(id) {
+  async eliminarMateria(id) {
     try {
-      const materias = this.getMaterias();
-      const filtered = materias.filter((m) => m.id !== id);
-      localStorage.setItem(`${this.dbName}_materias`, JSON.stringify(filtered));
+      const { error } = await supabase.from("materias").delete().eq("id", id);
+
+      if (error) throw error;
     } catch (error) {
       console.error("Error eliminando materia:", error);
       throw error;
     }
   }
 
-  getMateriaById(id) {
+  async getMateriaById(id) {
     try {
-      const materias = this.getMaterias();
-      return materias.find((m) => m.id === id) || null;
+      const { data, error } = await supabase
+        .from("materias")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error("Error obteniendo materia:", error);
       return null;
@@ -557,90 +234,110 @@ class LocalDatabase {
   }
 
   // ===== ASISTENCIAS =====
-  getAsistencia(fecha) {
+  async getAsistencia(fecha) {
     try {
-      const asistencias = this.getAsistencias();
-      const estudiantes = this.getEstudiantes();
-      const materias = this.getMaterias();
+      const currentUser = this.getCurrentUser();
 
-      return asistencias
-        .filter((a) => a.fecha === fecha)
-        .map((a) => ({
-          ...a,
-          estudiante_nombre:
-            estudiantes.find((e) => e.id === a.estudiante_id)?.nombre || "",
-          estudiante_codigo:
-            estudiantes.find((e) => e.id === a.estudiante_id)?.codigo || "",
-          materia_nombre:
-            materias.find((m) => m.id === a.materia_id)?.nombre || "",
-        }))
-        .sort((a, b) => a.estudiante_nombre.localeCompare(b.estudiante_nombre));
+      const { data, error } = await supabase
+        .from("asistencia")
+        .select(
+          `
+          *,
+          estudiantes:estudiante_id(nombre, codigo),
+          materias:materia_id(nombre)
+        `
+        )
+        .eq("fecha", fecha)
+        .eq("usuario_id", currentUser?.id)
+        .order("estudiantes(nombre)");
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error obteniendo asistencia:", error);
       return [];
     }
   }
 
-  getAsistencias() {
+  async getAsistencias() {
     try {
-      const data = localStorage.getItem(`${this.dbName}_asistencias`);
-      return data ? JSON.parse(data) : [];
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("asistencia")
+        .select("*")
+        .eq("usuario_id", currentUser?.id)
+        .order("fecha", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error obteniendo asistencias:", error);
       return [];
     }
   }
 
-  guardarAsistencia(asistencia) {
+  async guardarAsistencia(asistencia) {
     try {
-      const asistencias = this.getAsistencias();
-      const newId = Math.max(...asistencias.map((a) => a.id), 0) + 1;
-      const nuevaAsistencia = {
-        ...asistencia,
-        id: newId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      asistencias.push(nuevaAsistencia);
-      localStorage.setItem(
-        `${this.dbName}_asistencias`,
-        JSON.stringify(asistencias)
-      );
-      return nuevaAsistencia;
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("asistencia")
+        .insert({
+          ...asistencia,
+          usuario_id: currentUser?.id || null,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
     } catch (error) {
       console.error("Error guardando asistencia:", error);
       throw error;
     }
   }
 
-  guardarAsistenciaDia(fecha, asistencias) {
+  async guardarAsistenciaDia(fecha, asistencias) {
     try {
-      const todasAsistencias = this.getAsistencias();
+      const currentUser = this.getCurrentUser();
 
-      // Eliminar asistencias existentes para esa fecha
-      const asistenciasFiltradas = todasAsistencias.filter(
-        (a) => a.fecha !== fecha
-      );
+      // Eliminar asistencias existentes para esa fecha y usuario
+      await supabase
+        .from("asistencia")
+        .delete()
+        .eq("fecha", fecha)
+        .eq("usuario_id", currentUser?.id);
 
-      // Agregar nuevas asistencias
-      const nuevasAsistencias = asistencias.map((asistencia, index) => ({
-        id: Date.now() + index,
-        estudiante_id: asistencia.estudianteId,
-        materia_id: asistencia.materiaId,
+      // Insertar nuevas asistencias
+      const nuevasAsistencias = asistencias.map((asistencia) => ({
+        estudiante_id: asistencia.estudiante_id || asistencia.estudianteId,
+        materia_id: asistencia.materia_id || asistencia.materiaId,
+        usuario_id: currentUser?.id || null,
         fecha: fecha,
         estado: asistencia.estado,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
       }));
 
-      const todasNuevas = [...asistenciasFiltradas, ...nuevasAsistencias];
-      localStorage.setItem(
-        `${this.dbName}_asistencias`,
-        JSON.stringify(todasNuevas)
-      );
+      console.log("🔍 Datos a insertar:", nuevasAsistencias);
+
+      const { data, error } = await supabase
+        .from("asistencia")
+        .insert(nuevasAsistencias)
+        .select();
+
+      if (error) {
+        console.error("❌ Error insertando asistencias:", error);
+        throw error;
+      }
 
       console.log(
         `✅ Asistencia guardada para ${fecha}: ${asistencias.length} registros`
+      );
+      console.log(
+        "📊 Estados guardados:",
+        data.map((d) => ({ estudiante: d.estudiante_id, estado: d.estado }))
       );
       return true;
     } catch (error) {
@@ -649,145 +346,179 @@ class LocalDatabase {
     }
   }
 
-  getAsistenciaEstudiante(estudianteId, fecha) {
+  async getAsistenciaEstudiante(estudianteId, fecha) {
     try {
-      const asistencias = this.getAsistencias();
-      const asistencia = asistencias.find(
-        (a) => a.estudiante_id === estudianteId && a.fecha === fecha
-      );
-      return asistencia ? asistencia.estado : null;
+      const { data, error } = await supabase
+        .from("asistencia")
+        .select("estado")
+        .eq("estudiante_id", estudianteId)
+        .eq("fecha", fecha)
+        .single();
+
+      if (error) return null;
+      return data?.estado || null;
     } catch (error) {
       console.error("Error obteniendo asistencia de estudiante:", error);
       return null;
     }
   }
 
-  // ===== NOTAS =====
-  getNotas(materiaId, periodo) {
+  // ===== PERÍODOS ACADÉMICOS =====
+  async getPeriodosAcademicos() {
     try {
-      const notas = this.getTodasNotas();
-      const estudiantes = this.getEstudiantes();
-      const materias = this.getMaterias();
+      const { data, error } = await supabase
+        .from("periodos")
+        .select("*")
+        .order("id");
 
-      return notas
-        .filter((n) => n.materia_id === materiaId && n.periodo === periodo)
-        .map((n) => ({
-          ...n,
-          estudiante_nombre:
-            estudiantes.find((e) => e.id === n.estudiante_id)?.nombre || "",
-          estudiante_codigo:
-            estudiantes.find((e) => e.id === n.estudiante_id)?.codigo || "",
-          materia_nombre:
-            materias.find((m) => m.id === n.materia_id)?.nombre || "",
-        }))
-        .sort((a, b) => a.estudiante_nombre.localeCompare(b.estudiante_nombre));
-    } catch (error) {
-      console.error("Error obteniendo notas:", error);
-      return [];
-    }
-  }
+      if (error) throw error;
 
-  getTodasNotas() {
-    try {
-      const data = localStorage.getItem(`${this.dbName}_notas`);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error("Error obteniendo notas:", error);
-      return [];
-    }
-  }
-
-  guardarNota(nota) {
-    try {
-      const notas = this.getTodasNotas();
-      const newId = Math.max(...notas.map((n) => n.id), 0) + 1;
-      const nuevaNota = {
-        ...nota,
-        id: newId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      notas.push(nuevaNota);
-      localStorage.setItem(`${this.dbName}_notas`, JSON.stringify(notas));
-      console.log("✅ Nota guardada:", nuevaNota);
-      return nuevaNota;
-    } catch (error) {
-      console.error("Error guardando nota:", error);
-      throw error;
-    }
-  }
-
-  actualizarNota(id, datos) {
-    try {
-      const notas = this.getTodasNotas();
-      const index = notas.findIndex((n) => n.id === id);
-      if (index !== -1) {
-        notas[index] = {
-          ...notas[index],
-          ...datos,
-          updated_at: new Date().toISOString(),
+      // Convertir a formato esperado
+      const periodos = {};
+      data.forEach((periodo) => {
+        periodos[periodo.numero] = {
+          fechaInicio: periodo.fecha_inicio,
+          fechaFin: periodo.fecha_fin,
         };
-        localStorage.setItem(`${this.dbName}_notas`, JSON.stringify(notas));
-        console.log("✅ Nota actualizada:", notas[index]);
-        return notas[index];
-      }
-      return null;
+      });
+
+      return periodos;
     } catch (error) {
-      console.error("Error actualizando nota:", error);
+      console.error("Error obteniendo períodos académicos:", error);
+      // Fallback a valores por defecto
+      return {
+        1: { fechaInicio: "2025-01-27", fechaFin: "2025-04-04" },
+        2: { fechaInicio: "2025-04-07", fechaFin: "2025-06-16" },
+        3: { fechaInicio: "2025-07-07", fechaFin: "2025-09-12" },
+        4: { fechaInicio: "2025-09-15", fechaFin: "2025-11-28" },
+      };
+    }
+  }
+
+  async guardarPeriodosAcademicos(periodos) {
+    try {
+      const periodosArray = Object.entries(periodos)
+        .filter(([numero, datos]) => datos.fechaInicio && datos.fechaFin) // Solo guardar períodos completos
+        .map(([numero, datos]) => ({
+          numero: parseInt(numero),
+          nombre: `Período ${numero}`,
+          fecha_inicio: datos.fechaInicio,
+          fecha_fin: datos.fechaFin,
+          activo: true,
+          created_at: new Date().toISOString(),
+        }));
+
+      if (periodosArray.length === 0) {
+        console.log("⚠️ No hay períodos completos para guardar");
+        return;
+      }
+
+      const { error } = await supabase
+        .from("periodos")
+        .upsert(periodosArray, { onConflict: "numero" });
+
+      if (error) throw error;
+      console.log(
+        "✅ Períodos académicos guardados:",
+        periodosArray.length,
+        "períodos"
+      );
+    } catch (error) {
+      console.error("❌ Error guardando períodos académicos:", error);
       throw error;
     }
   }
 
-  // ===== TIPOS DE NOTA (COLUMNAS DINÁMICAS) =====
-  getTiposNotaPeriodo() {
+  // ===== TIPOS DE NOTA =====
+  async getTiposNotaPeriodo() {
     try {
-      const data = localStorage.getItem(`${this.dbName}_tipos_nota_periodo`);
-      return data ? JSON.parse(data) : {};
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("tipos_nota_periodo")
+        .select("*")
+        .eq("usuario_id", currentUser?.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) return {};
+      return data?.contenido || {};
     } catch (error) {
       console.error("Error obteniendo tipos de nota:", error);
       return {};
     }
   }
 
-  guardarTiposNotaPeriodo(tiposNotaPeriodo) {
+  async guardarTiposNotaPeriodo(tiposNota) {
     try {
-      localStorage.setItem(
-        `${this.dbName}_tipos_nota_periodo`,
-        JSON.stringify(tiposNotaPeriodo)
-      );
-      console.log("✅ Tipos de nota guardados:", Object.keys(tiposNotaPeriodo));
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("tipos_nota_periodo")
+        .upsert({
+          usuario_id: currentUser?.id,
+          contenido: tiposNota,
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      console.log("✅ Tipos de nota guardados");
+      return data;
     } catch (error) {
-      console.error("Error guardando tipos de nota:", error);
+      console.error("❌ Error guardando tipos de nota:", error);
       throw error;
     }
   }
 
-  // ===== NOTAS DETALLADAS POR MATERIA =====
-  getNotasDetalladas() {
+  // ===== NOTAS DETALLADAS =====
+  async getNotasDetalladas() {
     try {
-      const data = localStorage.getItem(`${this.dbName}_notas_detalladas`);
-      return data ? JSON.parse(data) : {};
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("notas_detalladas")
+        .select("*")
+        .eq("usuario_id", currentUser?.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) return {};
+      return data?.contenido || {};
     } catch (error) {
       console.error("Error obteniendo notas detalladas:", error);
       return {};
     }
   }
 
-  guardarNotasDetalladas(notasDetalladas) {
+  async guardarNotasDetalladas(notas) {
     try {
-      localStorage.setItem(
-        `${this.dbName}_notas_detalladas`,
-        JSON.stringify(notasDetalladas)
-      );
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("notas_detalladas")
+        .upsert({
+          usuario_id: currentUser?.id,
+          contenido: notas,
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
       console.log("✅ Notas detalladas guardadas");
+      return data;
     } catch (error) {
-      console.error("Error guardando notas detalladas:", error);
+      console.error("❌ Error guardando notas detalladas:", error);
       throw error;
     }
   }
 
-  // ===== GUARDAR NOTA INDIVIDUAL =====
-  guardarNotaIndividual(
+  // ===== NOTAS INDIVIDUALES =====
+  async guardarNotaIndividual(
     materiaId,
     estudianteId,
     periodo,
@@ -796,151 +527,521 @@ class LocalDatabase {
     valor
   ) {
     try {
-      const notasDetalladas = this.getNotasDetalladas();
+      const currentUser = this.getCurrentUser();
 
-      // Inicializar estructura si no existe
-      if (!notasDetalladas[materiaId]) notasDetalladas[materiaId] = {};
-      if (!notasDetalladas[materiaId][estudianteId])
-        notasDetalladas[materiaId][estudianteId] = {};
-      if (!notasDetalladas[materiaId][estudianteId][`periodo${periodo}`]) {
-        notasDetalladas[materiaId][estudianteId][`periodo${periodo}`] = [];
+      // Validar y convertir tipos de datos
+      const safeData = {
+        materia_id: parseInt(materiaId),
+        estudiante_id: parseInt(estudianteId),
+        usuario_id: currentUser?.id,
+        periodo: parseInt(periodo),
+        tipo_nota_id: parseInt(tipoNotaId) || 1, // Si es muy grande, usar 1 por defecto
+        titulo: titulo?.toString() || "",
+        valor: parseFloat(valor) || 0,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Verificar que los IDs sean válidos
+      if (
+        isNaN(safeData.materia_id) ||
+        isNaN(safeData.estudiante_id) ||
+        isNaN(safeData.periodo)
+      ) {
+        throw new Error("IDs de materia, estudiante o período inválidos");
       }
 
-      const periodoKey = `periodo${periodo}`;
-      const notasPeriodo = notasDetalladas[materiaId][estudianteId][periodoKey];
-
-      // Buscar si ya existe una nota de este tipo
-      const notaExistente = notasPeriodo.find((n) => n.tipoId === tipoNotaId);
-
-      if (notaExistente) {
-        // Actualizar nota existente
-        notaExistente.valor = parseFloat(valor);
-        notaExistente.updated_at = new Date().toISOString();
-      } else {
-        // Agregar nueva nota
-        notasPeriodo.push({
-          id: Date.now() + estudianteId,
-          tipoId: tipoNotaId,
-          titulo: titulo,
-          valor: parseFloat(valor),
-          fecha: new Date().toISOString().split("T")[0],
-          created_at: new Date().toISOString(),
-        });
+      // Limitar tipo_nota_id a un rango seguro
+      if (safeData.tipo_nota_id > 1000 || safeData.tipo_nota_id < 1) {
+        safeData.tipo_nota_id = 1;
       }
 
-      this.guardarNotasDetalladas(notasDetalladas);
-      console.log(
-        `✅ Nota individual guardada: ${titulo} = ${valor} para estudiante ${estudianteId}`
-      );
-      return true;
+      console.log("🔄 Guardando nota individual con datos seguros:", safeData);
+
+      const { data, error } = await supabase
+        .from("notas_individuales")
+        .upsert(safeData, {
+          onConflict:
+            "materia_id,estudiante_id,periodo,tipo_nota_id,usuario_id",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      console.log("✅ Nota individual guardada:", data);
+      return data;
     } catch (error) {
-      console.error("Error guardando nota individual:", error);
+      console.error("❌ Error guardando nota individual:", error);
       throw error;
     }
   }
 
-  // ===== ELIMINAR NOTA INDIVIDUAL =====
-  eliminarNotaIndividual(materiaId, estudianteId, periodo, tipoNotaId) {
+  async actualizarNotaIndividual(notaId, nuevoValor) {
     try {
-      const notasDetalladas = this.getNotasDetalladas();
+      const currentUser = this.getCurrentUser();
+      
+      console.log("🔄 Actualizando nota individual:", {
+        notaId,
+        nuevoValor,
+        usuarioId: currentUser?.id
+      });
 
-      // Verificar que exista la estructura
-      if (!notasDetalladas[materiaId] ||
-          !notasDetalladas[materiaId][estudianteId] ||
-          !notasDetalladas[materiaId][estudianteId][`periodo${periodo}`]) {
-        console.log(`⚠️ No se encontraron notas para eliminar`);
-        return false;
-      }
+      const { error, data } = await supabase
+        .from("notas_individuales")
+        .update({ 
+          valor: nuevoValor,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", notaId)
+        .eq("usuario_id", currentUser?.id)
+        .select();
 
-      const periodoKey = `periodo${periodo}`;
-      const notasPeriodo = notasDetalladas[materiaId][estudianteId][periodoKey];
-
-      // Filtrar la nota específica
-      const notasOriginal = notasPeriodo.length;
-      notasDetalladas[materiaId][estudianteId][periodoKey] = 
-        notasPeriodo.filter(n => n.tipoId !== tipoNotaId);
-
-      const notasFinal = notasDetalladas[materiaId][estudianteId][periodoKey].length;
-
-      if (notasOriginal > notasFinal) {
-        this.guardarNotasDetalladas(notasDetalladas);
-        console.log(`✅ Nota individual eliminada para estudiante ${estudianteId}, tipo ${tipoNotaId}`);
-        return true;
-      } else {
-        console.log(`⚠️ No se encontró la nota para eliminar`);
-        return false;
-      }
+      if (error) throw error;
+      console.log(`✅ Nota individual actualizada:`, data);
+      return data[0];
     } catch (error) {
-      console.error("Error eliminando nota individual:", error);
+      console.error("❌ Error actualizando nota individual:", error);
+      throw error;
+    }
+  }
+
+  async eliminarNotaIndividualPorId(notaId) {
+    try {
+      const currentUser = this.getCurrentUser();
+      
+      console.log("🗑️ Eliminando nota individual por ID:", {
+        notaId,
+        usuarioId: currentUser?.id
+      });
+
+      const { error, count } = await supabase
+        .from("notas_individuales")
+        .delete()
+        .eq("id", notaId)
+        .eq("usuario_id", currentUser?.id);
+
+      if (error) throw error;
+      console.log(`✅ Nota individual eliminada por ID. Filas afectadas: ${count}`);
+    } catch (error) {
+      console.error("❌ Error eliminando nota individual por ID:", error);
+      throw error;
+    }
+  }
+
+  async eliminarNotaIndividual(materiaId, estudianteId, periodo, tipoNotaId) {
+    try {
+      const currentUser = this.getCurrentUser();
+      
+      console.log("🗑️ Eliminando nota individual:", {
+        materiaId,
+        estudianteId,
+        periodo,
+        tipoNotaId,
+        usuarioId: currentUser?.id
+      });
+
+      const { error, count } = await supabase
+        .from("notas_individuales")
+        .delete()
+        .eq("materia_id", materiaId)
+        .eq("estudiante_id", estudianteId)
+        .eq("usuario_id", currentUser?.id)
+        .eq("periodo", periodo)
+        .eq("tipo_nota_id", tipoNotaId);
+
+      if (error) throw error;
+      console.log(`✅ Nota individual eliminada. Filas afectadas: ${count}`);
+    } catch (error) {
+      console.error("❌ Error eliminando nota individual:", error);
       throw error;
     }
   }
 
   // ===== NOTAS PERSONALES =====
-  getNotasPersonales() {
+  async getNotasPersonales() {
     try {
-      const data = localStorage.getItem(`${this.dbName}_notas_personales`);
-      const notas = data ? JSON.parse(data) : [];
-      return notas.length > 0 ? notas[0] : null;
+      const currentUser = this.getCurrentUser();
+      console.log("🔍 getNotasPersonales - Usuario:", currentUser?.id);
+
+      const { data, error } = await supabase
+        .from("notas_personales")
+        .select("*")
+        .eq("usuario_id", currentUser?.id)
+        .single();
+
+      console.log("🔍 getNotasPersonales - Respuesta:", { data, error });
+
+      if (error) {
+        console.error("❌ Error en getNotasPersonales:", error);
+        return null;
+      }
+      return data;
     } catch (error) {
-      console.error("Error obteniendo notas personales:", error);
+      console.error("❌ Error obteniendo notas personales:", error);
       return null;
     }
   }
 
-  guardarNotasPersonales(contenido) {
+  async guardarNotasPersonales(contenido) {
     try {
-      const notas = [
-        {
-          id: 1,
-          contenido: contenido,
-          fecha_creacion: new Date().toISOString(),
-          fecha_actualizacion: new Date().toISOString(),
-        },
-      ];
-      localStorage.setItem(
-        `${this.dbName}_notas_personales`,
-        JSON.stringify(notas)
-      );
-      return notas[0];
+      const currentUser = this.getCurrentUser();
+      console.log("💾 guardarNotasPersonales - Usuario:", currentUser?.id);
+      console.log("💾 guardarNotasPersonales - Contenido:", contenido.substring(0, 50) + (contenido.length > 50 ? '...' : ''));
+
+      if (!currentUser?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      // Primero intentar actualizar si existe
+      const { data: existingData, error: selectError } = await supabase
+        .from("notas_personales")
+        .select("id")
+        .eq("usuario_id", currentUser.id)
+        .single();
+
+      console.log("🔍 Verificando si existe registro:", { existingData, selectError });
+
+      if (existingData && !selectError) {
+        // Actualizar registro existente
+        console.log("🔄 Actualizando registro existente:", existingData.id);
+        const { data, error } = await supabase
+          .from("notas_personales")
+          .update({
+            contenido: contenido,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingData.id)
+          .select()
+          .single();
+
+        console.log("💾 Respuesta de actualización:", { data, error });
+        
+        if (error) {
+          console.error("❌ Error actualizando notas personales:", error);
+          throw error;
+        }
+        return data;
+      } else {
+        // Crear nuevo registro
+        console.log("➕ Creando nuevo registro");
+        const { data, error } = await supabase
+          .from("notas_personales")
+          .insert({
+            usuario_id: currentUser.id,
+            contenido: contenido,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        console.log("💾 Respuesta de inserción:", { data, error });
+        
+        if (error) {
+          console.error("❌ Error insertando notas personales:", error);
+          throw error;
+        }
+        return data;
+      }
     } catch (error) {
-      console.error("Error guardando notas personales:", error);
+      console.error("❌ Error guardando notas personales:", error);
+      throw error;
+    }
+  }
+
+  // ===== CALENDARIO ESCOLAR PDF =====
+  async getCalendarioEscolarPdf() {
+    try {
+      const currentUser = this.getCurrentUser();
+      console.log("📄 getCalendarioEscolarPdf - Usuario:", currentUser?.id);
+
+      const { data, error } = await supabase
+        .from("calendario_escolar_pdf")
+        .select("*")
+        .eq("usuario_id", currentUser?.id)
+        .single();
+
+      console.log("📄 getCalendarioEscolarPdf - Respuesta:", { data, error });
+
+      if (error) {
+        console.error("❌ Error en getCalendarioEscolarPdf:", error);
+        return null;
+      }
+      return data;
+    } catch (error) {
+      console.error("❌ Error obteniendo calendario escolar PDF:", error);
+      return null;
+    }
+  }
+
+  async guardarCalendarioEscolarPdf(archivoData, nombreArchivo) {
+    try {
+      const currentUser = this.getCurrentUser();
+      console.log("💾 guardarCalendarioEscolarPdf - Usuario:", currentUser?.id);
+      console.log("💾 guardarCalendarioEscolarPdf - Archivo:", nombreArchivo);
+
+      if (!currentUser?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      // Primero intentar actualizar si existe
+      const { data: existingData, error: selectError } = await supabase
+        .from("calendario_escolar_pdf")
+        .select("id")
+        .eq("usuario_id", currentUser.id)
+        .single();
+
+      console.log("🔍 Verificando si existe calendario PDF:", { existingData, selectError });
+
+      if (existingData && !selectError) {
+        // Actualizar registro existente
+        console.log("🔄 Actualizando calendario PDF existente:", existingData.id);
+        const { data, error } = await supabase
+          .from("calendario_escolar_pdf")
+          .update({
+            nombre_archivo: nombreArchivo,
+            datos_archivo: archivoData,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingData.id)
+          .select()
+          .single();
+
+        console.log("💾 Respuesta de actualización:", { data, error });
+        
+        if (error) {
+          console.error("❌ Error actualizando calendario PDF:", error);
+          throw error;
+        }
+        return data;
+      } else {
+        // Crear nuevo registro
+        console.log("➕ Creando nuevo calendario PDF");
+        const { data, error } = await supabase
+          .from("calendario_escolar_pdf")
+          .insert({
+            usuario_id: currentUser.id,
+            nombre_archivo: nombreArchivo,
+            datos_archivo: archivoData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        console.log("💾 Respuesta de inserción:", { data, error });
+        
+        if (error) {
+          console.error("❌ Error insertando calendario PDF:", error);
+          throw error;
+        }
+        return data;
+      }
+    } catch (error) {
+      console.error("❌ Error guardando calendario escolar PDF:", error);
+      throw error;
+    }
+  }
+
+  async eliminarCalendarioEscolarPdf() {
+    try {
+      const currentUser = this.getCurrentUser();
+      console.log("🗑️ eliminarCalendarioEscolarPdf - Usuario:", currentUser?.id);
+
+      if (!currentUser?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      const { error } = await supabase
+        .from("calendario_escolar_pdf")
+        .delete()
+        .eq("usuario_id", currentUser.id);
+
+      console.log("🗑️ Respuesta de eliminación:", { error });
+
+      if (error) {
+        console.error("❌ Error eliminando calendario PDF:", error);
+        throw error;
+      }
+
+      console.log("✅ Calendario PDF eliminado correctamente");
+      return true;
+    } catch (error) {
+      console.error("❌ Error eliminando calendario escolar PDF:", error);
+      throw error;
+    }
+  }
+
+  // ===== EVENTOS DE CALENDARIO =====
+  async getEventosCalendario() {
+    try {
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("eventos_calendario")
+        .select("*")
+        .eq("usuario_id", currentUser?.id)
+        .order("fecha", { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error("Error obteniendo eventos del calendario:", error);
+      return [];
+    }
+  }
+
+  async guardarEventoCalendario(evento) {
+    try {
+      const currentUser = this.getCurrentUser();
+
+      const eventoData = {
+        usuario_id: currentUser?.id,
+        titulo: evento.titulo?.trim(),
+        descripcion: evento.descripcion?.trim(),
+        fecha: evento.fecha,
+        hora_inicio: evento.hora_inicio || evento.startTime,
+        hora_fin: evento.hora_fin || evento.endTime,
+        tipo: evento.tipo || "personal",
+        recordatorio: evento.recordatorio || 15,
+        ubicacion: evento.ubicacion?.trim() || evento.location?.trim(),
+        created_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from("eventos_calendario")
+        .insert(eventoData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      console.log("✅ Evento guardado:", data.titulo);
+      return data;
+    } catch (error) {
+      console.error("❌ Error guardando evento:", error);
+      throw error;
+    }
+  }
+
+  async actualizarEventoCalendario(id, datos) {
+    try {
+      const { data, error } = await supabase
+        .from("eventos_calendario")
+        .update({
+          ...datos,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error actualizando evento:", error);
+      throw error;
+    }
+  }
+
+  async eliminarEventoCalendario(id) {
+    try {
+      const { error } = await supabase
+        .from("eventos_calendario")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      console.log("✅ Evento eliminado");
+    } catch (error) {
+      console.error("Error eliminando evento:", error);
+      throw error;
+    }
+  }
+
+  // ===== CONFIGURACIÓN DE USUARIO =====
+  async getConfiguracionUsuario() {
+    try {
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("configuracion_usuario")
+        .select("*")
+        .eq("usuario_id", currentUser?.id)
+        .single();
+
+      if (error) return null;
+      return data;
+    } catch (error) {
+      console.error("Error obteniendo configuración:", error);
+      return null;
+    }
+  }
+
+  async guardarConfiguracionUsuario(configuracion) {
+    try {
+      const currentUser = this.getCurrentUser();
+
+      const { data, error } = await supabase
+        .from("configuracion_usuario")
+        .upsert({
+          usuario_id: currentUser?.id,
+          tema: configuracion.tema || "light",
+          configuraciones: configuracion.configuraciones || {},
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error guardando configuración:", error);
       throw error;
     }
   }
 
   // ===== ESTADÍSTICAS =====
-  getEstadisticasAsistencia(fechaInicio, fechaFin) {
+  async getEstadisticasAsistencia(fechaInicio, fechaFin) {
     try {
-      const asistencias = this.getAsistencias();
-      const estudiantes = this.getEstudiantes();
+      const currentUser = this.getCurrentUser();
 
-      return estudiantes
-        .map((estudiante) => {
-          const asistenciasEstudiante = asistencias.filter(
-            (a) =>
-              a.estudiante_id === estudiante.id &&
-              a.fecha >= fechaInicio &&
-              a.fecha <= fechaFin
-          );
+      const { data, error } = await supabase
+        .from("asistencia")
+        .select(
+          `
+          estudiante_id,
+          estado,
+          estudiantes:estudiante_id(nombre, codigo)
+        `
+        )
+        .gte("fecha", fechaInicio)
+        .lte("fecha", fechaFin)
+        .eq("usuario_id", currentUser?.id);
 
-          const presentes = asistenciasEstudiante.filter(
-            (a) => a.estado === "presente"
-          ).length;
-          const ausentes = asistenciasEstudiante.filter(
-            (a) => a.estado === "ausente"
-          ).length;
-          const total = asistenciasEstudiante.length;
+      if (error) throw error;
 
-          return {
-            estudiante_nombre: estudiante.nombre,
-            estudiante_codigo: estudiante.codigo,
-            presentes,
-            ausentes,
-            total,
+      // Procesar datos para estadísticas
+      const estadisticas = {};
+      data.forEach((asistencia) => {
+        const estudianteId = asistencia.estudiante_id;
+        if (!estadisticas[estudianteId]) {
+          estadisticas[estudianteId] = {
+            estudiante_nombre: asistencia.estudiantes.nombre,
+            estudiante_codigo: asistencia.estudiantes.codigo,
+            presentes: 0,
+            ausentes: 0,
+            total: 0,
           };
-        })
-        .sort((a, b) => a.estudiante_nombre.localeCompare(b.estudiante_nombre));
+        }
+
+        estadisticas[estudianteId].total++;
+        if (asistencia.estado === "presente") {
+          estadisticas[estudianteId].presentes++;
+        } else {
+          estadisticas[estudianteId].ausentes++;
+        }
+      });
+
+      return Object.values(estadisticas);
     } catch (error) {
       console.error("Error obteniendo estadísticas:", error);
       return [];
@@ -948,14 +1049,13 @@ class LocalDatabase {
   }
 
   // ===== EXPORTAR/IMPORTAR =====
-  exportarDatos() {
+  async exportarDatos() {
     try {
       const datos = {
-        estudiantes: this.getEstudiantes(),
-        materias: this.getMaterias(),
-        asistencias: this.getAsistencias(),
-        notas: this.getTodasNotas(),
-        notas_personales: this.getNotasPersonales(),
+        estudiantes: await this.getEstudiantes(),
+        materias: await this.getMaterias(),
+        asistencias: await this.getAsistencias(),
+        notas_personales: await this.getNotasPersonales(),
         fecha: new Date().toISOString(),
       };
 
@@ -977,15 +1077,15 @@ class LocalDatabase {
   }
 
   // ===== UTILIDADES =====
-  getDatabaseInfo() {
+  async getDatabaseInfo() {
     try {
       const info = {
-        estudiantes: this.getEstudiantes().length,
-        materias: this.getMaterias().length,
-        asistencias: this.getAsistencias().length,
-        notas: this.getTodasNotas().length,
-        notas_personales: this.getNotasPersonales() ? 1 : 0,
+        estudiantes: (await this.getEstudiantes()).length,
+        materias: (await this.getMaterias()).length,
+        asistencias: (await this.getAsistencias()).length,
+        notas_personales: (await this.getNotasPersonales()) ? 1 : 0,
         fecha_ultima_actualizacion: new Date().toISOString(),
+        tipo_base_datos: "Supabase",
       };
       return info;
     } catch (error) {
@@ -994,13 +1094,152 @@ class LocalDatabase {
     }
   }
 
-  // Limpiar base de datos
-  limpiarBaseDatos() {
+  // Eliminar asistencia por ID
+  async eliminarAsistencia(id) {
     try {
-      const keys = Object.keys(localStorage).filter((key) =>
-        key.startsWith(this.dbName)
-      );
-      keys.forEach((key) => localStorage.removeItem(key));
+      const { error } = await supabase
+        .from("asistencia")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      console.log("✅ Asistencia eliminada:", id);
+    } catch (error) {
+      console.error("❌ Error eliminando asistencia:", error);
+      throw error;
+    }
+  }
+
+  // Limpiar todas las notas del usuario
+  async limpiarNotasPersonales() {
+    try {
+      const currentUser = this.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      // Limpiar notas detalladas
+      const { error: errorDetalladas } = await supabase
+        .from("notas_detalladas")
+        .delete()
+        .eq("usuario_id", currentUser.id);
+
+      if (errorDetalladas) throw errorDetalladas;
+
+      // Limpiar notas individuales
+      const { error: errorIndividuales } = await supabase
+        .from("notas_individuales")
+        .delete()
+        .eq("usuario_id", currentUser.id);
+
+      if (errorIndividuales) throw errorIndividuales;
+
+      // Limpiar tipos de nota por período
+      const { error: errorTiposNota } = await supabase
+        .from("tipos_nota_periodo")
+        .delete()
+        .eq("usuario_id", currentUser.id);
+
+      if (errorTiposNota) throw errorTiposNota;
+
+      console.log("✅ Todas las notas y tipos de nota limpiados");
+    } catch (error) {
+      console.error("❌ Error limpiando notas:", error);
+      throw error;
+    }
+  }
+
+  // Limpiar períodos académicos del usuario
+  async limpiarPeriodosAcademicos() {
+    try {
+      const currentUser = this.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      const { error } = await supabase
+        .from("periodos")
+        .delete()
+        .eq("usuario_id", currentUser.id);
+
+      if (error) throw error;
+      console.log("✅ Períodos académicos limpiados");
+    } catch (error) {
+      console.error("❌ Error limpiando períodos académicos:", error);
+      throw error;
+    }
+  }
+
+  // Limpiar calendario personal del usuario
+  async limpiarCalendarioPersonal() {
+    try {
+      const currentUser = this.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      const { error } = await supabase
+        .from("eventos_calendario")
+        .delete()
+        .eq("usuario_id", currentUser.id);
+
+      if (error) throw error;
+      console.log("✅ Calendario personal limpiado");
+    } catch (error) {
+      console.error("❌ Error limpiando calendario personal:", error);
+      throw error;
+    }
+  }
+
+  // Limpiar completamente todos los estudiantes del usuario (función de respaldo)
+  async limpiarEstudiantesCompleto() {
+    try {
+      const currentUser = this.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      const { error } = await supabase
+        .from("estudiantes")
+        .delete()
+        .eq("usuario_id", currentUser.id);
+
+      if (error) throw error;
+      console.log("✅ Todos los estudiantes eliminados completamente");
+    } catch (error) {
+      console.error("❌ Error limpiando estudiantes:", error);
+      throw error;
+    }
+  }
+
+  // Limpiar completamente todas las materias del usuario (función de respaldo)
+  async limpiarMateriasCompleto() {
+    try {
+      const currentUser = this.getCurrentUser();
+      if (!currentUser?.id) {
+        throw new Error("Usuario no autenticado");
+      }
+
+      const { error } = await supabase
+        .from("materias")
+        .delete()
+        .eq("usuario_id", currentUser.id);
+
+      if (error) throw error;
+      console.log("✅ Todas las materias eliminadas completamente");
+    } catch (error) {
+      console.error("❌ Error limpiando materias:", error);
+      throw error;
+    }
+  }
+
+  // Limpiar base de datos
+  async limpiarBaseDatos() {
+    try {
+      await supabase.from("asistencias").delete().neq("id", 0);
+      await supabase.from("materias").delete().neq("id", 0);
+      await supabase.from("estudiantes").delete().neq("id", 0);
+
       console.log("✅ Base de datos limpiada");
     } catch (error) {
       console.error("Error limpiando base de datos:", error);
@@ -1010,5 +1249,4 @@ class LocalDatabase {
 
 // Instancia global
 const db = new LocalDatabase();
-
 export default db;

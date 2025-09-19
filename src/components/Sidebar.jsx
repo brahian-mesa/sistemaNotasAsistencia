@@ -2,23 +2,19 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../style/Navbar.css";
 import auth from "../utils/auth";
-import { Table, Row, Col, Button, Container } from "react-bootstrap";
+import db from "../utils/database";
 import EditUsernameModal from "./EditUsernameModal";
 import { GoHomeFill } from "react-icons/go"; // home icon
-import { FaUserAlt } from "react-icons/fa"; // User icon
 import { CalendarIcon } from '@heroicons/react/24/outline'; // Calendar icon
 import { ClipboardDocumentListIcon } from '@heroicons/react/24/outline'; // Notes icon
 import { BookOpenIcon } from '@heroicons/react/24/outline'; // Book icon
-import { ChartBarIcon } from '@heroicons/react/24/outline'; // Chart icon
 import { PencilIcon } from '@heroicons/react/24/outline'; // Pencil icon
 import { IoSettingsSharp } from "react-icons/io5"; // Settings icon
-import { BsArrowBarLeft } from "react-icons/bs"; // Home page icon
 import { MdClose } from "react-icons/md"; // Close icon
 import { LuCircleUserRound } from "react-icons/lu"; // User icon settings
 import { MdColorLens } from "react-icons/md"; // Color icon settings
 import { GrCircleInformation } from "react-icons/gr"; // Information icon settings
 import { IoIosArrowForward } from "react-icons/io"; // row icon
-import { FaExchangeAlt } from "react-icons/fa"; // Change icon
 import { ImExit } from "react-icons/im"; // Exit icon
 
 export default function Sidebar() {
@@ -319,26 +315,53 @@ export default function Sidebar() {
     };
 
     // Estado para el tema actual
-    const [theme, setTheme] = useState(() => {
-        return localStorage.getItem("notassystem-theme") || "";
-    });
+    const [theme, setTheme] = useState("light");
+
+    // Cargar tema desde Supabase al montar
+    useEffect(() => {
+        const loadTheme = async () => {
+            try {
+                const config = await db.getConfiguracionUsuario();
+                const temaGuardado = config?.tema || "light";
+                setTheme(temaGuardado);
+                applyThemeClass(temaGuardado);
+                console.log('✅ Tema cargado desde Supabase:', temaGuardado);
+            } catch (error) {
+                console.error('❌ Error cargando tema:', error);
+                setTheme("light");
+                applyThemeClass("light");
+            }
+        };
+
+        loadTheme();
+    }, []);
 
     // Aplica el tema al montar y cuando cambia
     useEffect(() => {
         applyThemeClass(theme);
     }, [theme]);
 
-    // Cambia el tema y lo guarda en localStorage
-    const handleThemeChange = (themeName) => {
-        setTheme(themeName);
-        localStorage.setItem("notassystem-theme", themeName);
-        console.log(`🎨 Tema cambiado a: ${themeName}`);
+    // Cambia el tema y lo guarda en Supabase
+    const handleThemeChange = async (themeName) => {
+        try {
+            setTheme(themeName);
+            await db.guardarConfiguracionUsuario({ tema: themeName });
+            console.log(`🎨 Tema cambiado a: ${themeName} y guardado en Supabase`);
+        } catch (error) {
+            console.error('❌ Error guardando tema:', error);
+        }
     };
 
     // Restablece el tema por defecto
-    const handleResetTheme = () => {
-        setTheme("");
-        localStorage.removeItem("notassystem-theme");
+    const handleResetTheme = async () => {
+        try {
+            setTheme("light");
+            await db.guardarConfiguracionUsuario({ tema: "light" });
+            applyThemeClass("light");
+            console.log("🎨 Tema restablecido a light y guardado en Supabase");
+        } catch (error) {
+            console.error('❌ Error restableciendo tema:', error);
+        }
     };
 
     return (
@@ -380,7 +403,7 @@ export default function Sidebar() {
 
                     <Link to="/notas">
                         <button className={getButtonClass("/notas")}>
-                            <ChartBarIcon className="w-6 h-6 mr-4" />
+                            <BookOpenIcon className="w-6 h-6 mr-4" />
                             Notas Docente
                         </button>
                     </Link>
@@ -472,7 +495,7 @@ export default function Sidebar() {
             <nav className="lg:hidden fixed bottom-0 left-0 w-full bottom-nav-rounded text-purple-800 flex justify-center items-center py-6 shadow-2xl z-50 gap-6">
                 {[
                     {
-                        name: "/",
+                        name: "/home",
                         icon: <GoHomeFill className="w-6 h-6" />,
                         label: "Home",
                     },
@@ -490,7 +513,8 @@ export default function Sidebar() {
                         name: "/asistencia",
                         icon: <ClipboardDocumentListIcon className="w-6 h-6" />,
                         label: "Asistencia",
-                    },
+                        isLink: true
+                    }
                 ].map((btn) => (
                     <Link
                         key={btn.name}
@@ -515,7 +539,85 @@ export default function Sidebar() {
                         </span>
                     </Link>
                 ))}
+
+                {/* Botón de Configuración (separado para manejar el click diferente) */}
+                <button
+                    onClick={() => setShowSettingsPanel(true)}
+                    className="flex flex-col items-center justify-center gap-1 p-2"
+                >
+                    <div
+                        className={`flex items-center justify-center w-14 h-14 transition-all duration-300 ease-in-out border-2 ${showSettingsPanel
+                            ? "bg-custom-pink text-white shadow-glow scale-110 border-pink-300 button-style"
+                            : "bg-purple-600 text-white hover:bg-purple-500 hover:shadow-purple hover:scale-105 border-purple-500 button-style"
+                            }`}
+                    >
+                        <IoSettingsSharp className="w-6 h-6" />
+                    </div>
+                    <span
+                        className={`text-xs font-medium ${showSettingsPanel
+                            ? "text-purple-800 font-bold"
+                            : "text-purple-700"
+                            }`}
+                    >
+                        Configuración
+                    </span>
+                </button>
             </nav>
+
+            {/* Panel de Configuración */}
+            {showSettingsPanel && (
+                <div
+                    ref={settingsPanelRef}
+                    className="fixed inset-0 z-70 flex items-center justify-center bg-black/10 backdrop-blur-sm"
+                >
+                    <div
+                        id="settings-panel-view-transition"
+                        className="settings-slide-in macos-elastic-open relative min-w-[800px] max-w-[90vw] h-[580px] p-8 bg-[var(--fondo)] rounded-2xl border-1 border-black/30  shadow-2xl "
+                    >
+                        {/* Botón de cerrar */}
+                        <button
+                            className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 hover:rounded-full hover:bg-[var(--color-quinto)] text-2xl font-bold p-2 cursor-pointer"
+                            onClick={() => setShowSettingsPanel(false)}
+                            aria-label="Cerrar"
+                        >
+                            <MdClose className="w-6 h-6" />
+                        </button>
+
+                        {/* Layout en dos columnas */}
+                        <div className="flex gap-8 h-full mt-10 items-stretch">
+                            {/* Navegación lateral */}
+                            <nav className="flex flex-col gap-0 w-1/4 h-11/12 border-[var(--color-secundario)] border-r-1">
+                                <button
+                                    className={settingsButton("account")}
+                                    onClick={() => setSelectedSettingsTab("account")}
+                                >
+                                    <LuCircleUserRound className="mr-2 h-6 w-6" />
+                                    Cuenta
+                                </button>
+                                <button
+                                    className={settingsButton("appearance")}
+                                    onClick={() => setSelectedSettingsTab("appearance")}
+                                >
+                                    <MdColorLens className="mr-2 h-6 w-6" />
+                                    Apariencia
+                                </button>
+                                <button
+                                    className={settingsButton("information")}
+                                    onClick={() => setSelectedSettingsTab("information")}
+                                >
+                                    <GrCircleInformation className="mr-2 h-6 w-6" />
+                                    Información
+                                </button>
+                            </nav>
+
+                            {/* Contenido a la derecha */}
+                            <div className="flex-1 bg-[var(--fondo)] rounded-xl h-11/12">
+                                {renderSettingsContent()}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modal para editar el nombre de usuario */}
             <EditUsernameModal

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, XMarkIcon, CalendarDaysIcon, ClockIcon, TrashIcon } from '@heroicons/react/24/outline'
 import PageContainer from '../components/PageContainer'
+import db from '../utils/database'
 
 export default function CalendarioPersonal() {
     const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -50,7 +51,6 @@ export default function CalendarioPersonal() {
 
                 return formattedHolidays
             } else {
-                console.error('Error fetching holidays:', response.status)
                 return []
             }
         } catch (error) {
@@ -61,26 +61,47 @@ export default function CalendarioPersonal() {
         }
     }
 
-    // Cargar eventos del localStorage al iniciar
+    // Cargar eventos desde Supabase al iniciar
     useEffect(() => {
         const loadData = async () => {
-            // Cargar eventos personales
-            const savedEvents = localStorage.getItem('calendar-events')
-            let userEvents = []
-            if (savedEvents) {
-                userEvents = JSON.parse(savedEvents)
+            try {
+                // Cargar eventos personales desde Supabase
+                const userEventsDB = await db.getEventosCalendario()
+                const userEvents = userEventsDB.map(evento => ({
+                    id: evento.id,
+                    date: evento.fecha,
+                    title: evento.titulo,
+                    description: evento.descripcion,
+                    startTime: evento.hora_inicio,
+                    endTime: evento.hora_fin,
+                    type: evento.tipo,
+                    reminder: evento.recordatorio,
+                    location: evento.ubicacion,
+                    isHoliday: false,
+                    createdAt: evento.created_at
+                }))
+
+                // Cargar días festivos para el año actual y siguiente
+                const currentYear = new Date().getFullYear()
+                const currentYearHolidays = await fetchHolidays(currentYear)
+                const nextYearHolidays = await fetchHolidays(currentYear + 1)
+
+                const allHolidays = [...currentYearHolidays, ...nextYearHolidays]
+                setHolidays(allHolidays)
+
+                // Combinar eventos de usuario con días festivos
+                setEvents([...userEvents, ...allHolidays])
+                
+            } catch (error) {
+                console.error('❌ Error cargando eventos:', error)
+                // Cargar solo días festivos en caso de error
+                const currentYear = new Date().getFullYear()
+                const currentYearHolidays = await fetchHolidays(currentYear)
+                const nextYearHolidays = await fetchHolidays(currentYear + 1)
+                const allHolidays = [...currentYearHolidays, ...nextYearHolidays]
+                setHolidays(allHolidays)
+                setEvents(allHolidays)
             }
-
-            // Cargar días festivos para el año actual y siguiente
-            const currentYear = new Date().getFullYear()
-            const currentYearHolidays = await fetchHolidays(currentYear)
-            const nextYearHolidays = await fetchHolidays(currentYear + 1)
-
-            const allHolidays = [...currentYearHolidays, ...nextYearHolidays]
-            setHolidays(allHolidays)
-
-            // Combinar eventos de usuario con días festivos
-            setEvents([...userEvents, ...allHolidays])
         }
 
         loadData()
@@ -97,19 +118,6 @@ export default function CalendarioPersonal() {
 
         return () => window.removeEventListener('resize', checkIfMobile)
     }, [])
-
-    // Guardar solo eventos de usuario en localStorage
-    const saveUserEvents = (allEvents) => {
-        const userEvents = allEvents.filter(event => !event.isHoliday)
-        localStorage.setItem('calendar-events', JSON.stringify(userEvents))
-    }
-
-    // Guardar eventos en localStorage cuando cambien (solo eventos no festivos)
-    useEffect(() => {
-        if (events.length > 0) {
-            saveUserEvents(events)
-        }
-    }, [events])
 
     const prevMonth = () => {
         setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
@@ -147,30 +155,61 @@ export default function CalendarioPersonal() {
         return events.filter(event => event.date === dateStr)
     }
 
-    const handleAddEvent = () => {
+    const handleAddEvent = async () => {
         if (!selectedDate || !eventForm.title.trim()) return
 
-        const newEvent = {
-            id: Date.now(),
-            date: formatDate(selectedDate),
-            title: eventForm.title.trim(),
-            description: eventForm.description.trim(),
-            startTime: eventForm.startTime,
-            endTime: eventForm.endTime,
-            type: eventForm.type,
-            reminder: eventForm.reminder,
-            location: eventForm.location.trim(),
-            isHoliday: false,
-            createdAt: new Date().toISOString()
-        }
+        try {
+            const newEvent = {
+                titulo: eventForm.title.trim(),
+                descripcion: eventForm.description.trim(),
+                fecha: formatDate(selectedDate),
+                hora_inicio: eventForm.startTime,
+                hora_fin: eventForm.endTime,
+                tipo: eventForm.type,
+                recordatorio: parseInt(eventForm.reminder),
+                ubicacion: eventForm.location.trim(),
+            }
 
-        setEvents([...events, newEvent])
-        resetEventForm()
-        setShowEventModal(false)
+            // Guardar en Supabase
+            const eventoGuardado = await db.guardarEventoCalendario(newEvent)
+
+            // Actualizar estado local
+            const eventoLocal = {
+                id: eventoGuardado.id,
+                date: eventoGuardado.fecha,
+                title: eventoGuardado.titulo,
+                description: eventoGuardado.descripcion,
+                startTime: eventoGuardado.hora_inicio,
+                endTime: eventoGuardado.hora_fin,
+                type: eventoGuardado.tipo,
+                reminder: eventoGuardado.recordatorio,
+                location: eventoGuardado.ubicacion,
+                isHoliday: false,
+                createdAt: eventoGuardado.created_at
+            }
+
+            setEvents(prev => [...prev, eventoLocal])
+            resetEventForm()
+            setShowEventModal(false)
+            
+        } catch (error) {
+            console.error('❌ Error guardando evento:', error)
+            alert('Error al guardar el evento')
+        }
     }
 
-    const handleDeleteEvent = (eventId) => {
-        setEvents(events.filter(event => event.id !== eventId))
+    const handleDeleteEvent = async (eventId) => {
+        try {
+            // Eliminar de Supabase
+            await db.eliminarEventoCalendario(eventId)
+            
+            // Actualizar estado local
+            setEvents(events.filter(event => event.id !== eventId))
+            
+        } catch (error) {
+            console.error('❌ Error eliminando evento:', error)
+            alert('Error al eliminar el evento')
+        }
     }
 
     const resetEventForm = () => {

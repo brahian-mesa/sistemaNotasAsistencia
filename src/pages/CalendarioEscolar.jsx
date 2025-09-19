@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
-import { MagnifyingGlassIcon, MagnifyingGlassMinusIcon } from '@heroicons/react/24/outline'
+import { useState, useRef, useEffect } from 'react'
+import { MagnifyingGlassIcon, MagnifyingGlassMinusIcon, DocumentArrowUpIcon, DocumentIcon } from '@heroicons/react/24/outline'
 import PageContainer from '../components/PageContainer'
 import calendarioPdf from '../assets/Resoluciones cronograma 2025 v1.pdf'
+import db from '../utils/database'
 
 export default function CalendarioEscolar() {
   const [showPdfViewer, setShowPdfViewer] = useState(true) // Mostrar PDF por defecto
@@ -11,9 +12,52 @@ export default function CalendarioEscolar() {
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-
+  
+  // Estados para carga de PDF personalizado
+  const [pdfPersonalizado, setPdfPersonalizado] = useState(null)
+  const [nombreArchivo, setNombreArchivo] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState('')
+  const [showUploadModal, setShowUploadModal] = useState(false)
   const pdfContainerRef = useRef(null)
   const pdfViewerRef = useRef(null)
+  const fileInputRef = useRef(null)
+
+  // Cargar PDF personalizado al iniciar
+  useEffect(() => {
+    const cargarPdfPersonalizado = async () => {
+      try {
+        setIsLoading(true);
+        console.log('🔄 Cargando PDF personalizado desde Supabase...');
+        
+        const pdfData = await db.getCalendarioEscolarPdf();
+        if (pdfData && pdfData.datos_archivo) {
+          // Convertir base64 a blob
+          const byteCharacters = atob(pdfData.datos_archivo);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          
+          setPdfPersonalizado(url);
+          setNombreArchivo(pdfData.nombre_archivo);
+          console.log('✅ PDF personalizado cargado:', pdfData.nombre_archivo);
+        } else {
+          console.log('📝 No hay PDF personalizado guardado');
+        }
+      } catch (error) {
+        console.error('❌ Error cargando PDF personalizado:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    cargarPdfPersonalizado();
+  }, []);
 
   const togglePdfViewer = () => {
     setShowPdfViewer(!showPdfViewer)
@@ -53,28 +97,152 @@ export default function CalendarioEscolar() {
     setPosition({ x: 0, y: 0 })
   }
 
-  // Centrar el PDF al cargar
   const centerPdf = () => {
     setPosition({ x: 0, y: 0 })
   }
 
+  // Función para manejar la carga de archivo PDF
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validar que sea un PDF
+    if (file.type !== 'application/pdf') {
+      setUploadStatus('❌ Solo se permiten archivos PDF');
+      setTimeout(() => setUploadStatus(''), 3000);
+      return;
+    }
+
+    // Validar tamaño (máximo 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadStatus('❌ El archivo es demasiado grande (máximo 10MB)');
+      setTimeout(() => setUploadStatus(''), 3000);
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadStatus('🔄 Cargando archivo...');
+
+      // Convertir archivo a base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const base64Data = e.target.result.split(',')[1]; // Remover el prefijo data:application/pdf;base64,
+          
+          // Guardar en la base de datos
+          await db.guardarCalendarioEscolarPdf(base64Data, file.name);
+          
+          // Crear URL para mostrar el PDF
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          
+          // Actualizar estado
+          setPdfPersonalizado(url);
+          setNombreArchivo(file.name);
+          setShowUploadModal(false);
+          setUploadStatus('✅ PDF cargado correctamente');
+          
+          console.log('✅ PDF cargado y guardado:', file.name);
+          
+          setTimeout(() => setUploadStatus(''), 3000);
+        } catch (error) {
+          console.error('❌ Error procesando archivo:', error);
+          setUploadStatus(`❌ Error al procesar: ${error.message}`);
+          setTimeout(() => setUploadStatus(''), 5000);
+        } finally {
+          setIsUploading(false);
+        }
+      };
+      
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('❌ Error cargando archivo:', error);
+      setUploadStatus(`❌ Error al cargar: ${error.message}`);
+      setTimeout(() => setUploadStatus(''), 5000);
+      setIsUploading(false);
+    }
+  };
+
+  // Función para eliminar PDF personalizado
+  const eliminarPdfPersonalizado = async () => {
+    if (confirm('¿Estás seguro de que quieres eliminar el PDF personalizado?')) {
+      try {
+        setIsUploading(true);
+        setUploadStatus('🔄 Eliminando PDF...');
+        
+        // Eliminar de la base de datos
+        await db.eliminarCalendarioEscolarPdf();
+        
+        // Limpiar estado local
+        setPdfPersonalizado(null);
+        setNombreArchivo('');
+        
+        setUploadStatus('✅ PDF eliminado');
+        setTimeout(() => setUploadStatus(''), 3000);
+      } catch (error) {
+        console.error('❌ Error eliminando PDF:', error);
+        setUploadStatus(`❌ Error al eliminar: ${error.message}`);
+        setTimeout(() => setUploadStatus(''), 5000);
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+
+  // Determinar qué PDF mostrar
+  const pdfToShow = pdfPersonalizado || calendarioPdf;
+  const pdfTitle = pdfPersonalizado ? nombreArchivo : "Calendario Escolar 2025";
+
   return (
     <PageContainer>
-      <div className="h-full bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 flex flex-col overflow-hidden">
-        {/* Header minimalista */}
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-800">Calendario Escolar 2025</h1>
+      <div className="h-full bg-white/90 backdrop-blur-sm rounded-lg shadow-lg border border-white/40 flex flex-col">
+        {/* Header */}
+        <div className="bg-white/95 border-b border-gray-200 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-bold text-gray-800">Calendario Escolar 2025</h1>
+            {nombreArchivo && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <DocumentIcon className="w-4 h-4" />
+                <span>{nombreArchivo}</span>
+                <button
+                  onClick={eliminarPdfPersonalizado}
+                  className="text-red-500 hover:text-red-700"
+                  title="Eliminar PDF personalizado"
+                >
+                  🗑️
+                </button>
+              </div>
+            )}
+          </div>
 
-          {/* Botón para mostrar/ocultar PDF */}
-          <button
-            onClick={togglePdfViewer}
-            className={`px-4 py-2 rounded-lg transition-colors ${showPdfViewer
-              ? 'bg-red-600 text-white hover:bg-red-700'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-          >
-            {showPdfViewer ? '❌ Ocultar PDF' : '📄 Mostrar PDF'}
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Botón para cargar PDF */}
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+            >
+              <DocumentArrowUpIcon className="w-4 h-4" />
+              Cargar PDF
+            </button>
+
+            {/* Botón para mostrar/ocultar PDF */}
+            <button
+              onClick={togglePdfViewer}
+              className={`px-4 py-2 rounded-lg transition-colors ${showPdfViewer
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+            >
+              {showPdfViewer ? '❌ Ocultar PDF' : '📄 Mostrar PDF'}
+            </button>
+          </div>
         </div>
 
         {/* Contenido principal - PDF a pantalla completa */}
@@ -109,8 +277,8 @@ export default function CalendarioEscolar() {
                   🔄 Resetear Vista
                 </button>
                 <a
-                  href={calendarioPdf}
-                  download="Calendario_Escolar_2025.pdf"
+                  href={pdfToShow}
+                  download={pdfTitle.replace(/\s+/g, '_') + '.pdf'}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors"
                 >
                   📥 Descargar
@@ -129,19 +297,19 @@ export default function CalendarioEscolar() {
                     }}
                   >
                     <iframe
-                      src={calendarioPdf}
+                      src={pdfToShow}
                       className="block"
                       style={{
                         width: '900px',
                         height: '1200px',
                         border: 'none'
                       }}
-                      title="Calendario Escolar 2025"
+                      title={pdfTitle}
                       onLoad={() => {
-                        console.log('✅ PDF cargado correctamente')
+                        console.log('PDF cargado correctamente');
                       }}
                       onError={() => {
-                        console.error('❌ Error cargando PDF')
+                        console.error('Error cargando PDF');
                       }}
                     />
                   </div>
@@ -151,13 +319,13 @@ export default function CalendarioEscolar() {
                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50" style={{ zIndex: -1 }}>
                   <div className="text-center">
                     <div className="text-4xl mb-4">📄</div>
-                    <h3 className="text-lg font-medium text-gray-700 mb-2">Calendario Escolar 2025</h3>
+                    <h3 className="text-lg font-medium text-gray-700 mb-2">{pdfTitle}</h3>
                     <p className="text-gray-500 mb-4">
                       Si no se muestra el PDF, puedes descargarlo directamente:
                     </p>
                     <a
-                      href={calendarioPdf}
-                      download="Calendario_Escolar_2025.pdf"
+                      href={pdfToShow}
+                      download={pdfTitle.replace(/\s+/g, '_') + '.pdf'}
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
                     >
                       📥 Descargar PDF
@@ -185,6 +353,41 @@ export default function CalendarioEscolar() {
             </div>
           )}
         </div>
+
+        {/* Modal para cargar PDF */}
+        {showUploadModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold mb-4">Cargar PDF Personalizado</h3>
+              
+              <div className="mb-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileUpload}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+
+              {uploadStatus && (
+                <div className="mb-4 p-3 bg-gray-100 rounded-lg text-sm">
+                  {uploadStatus}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowUploadModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={isUploading}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </PageContainer>
   )

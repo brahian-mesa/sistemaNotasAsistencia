@@ -1,92 +1,72 @@
 import React, { useState } from 'react';
-import { Modal, Button, Form } from 'react-bootstrap';
 
-const EditUsernameModal = ({ show, onClose, currentUsername, onSave }) => {
-    const [username, setUsername] = useState(currentUsername);
+export default function EditUsernameModal({ show, onClose, currentUsername, onSave }) {
+  const [newUsername, setNewUsername] = useState(currentUsername);
+  const [isLoading, setIsLoading] = useState(false);
 
-    const handleSave = () => {
-        if (username.trim()) {
-            // Actualizar en localStorage
-            const userStr = localStorage.getItem("user");
-            if (userStr) {
-                const user = JSON.parse(userStr);
-                user.userName = username;
-                localStorage.setItem("user", JSON.stringify(user));
-            } else {
-                // Si no existe, crear un usuario básico
-                localStorage.setItem("user", JSON.stringify({ userName: username, userEmail: "usuario@email.com" }));
-            }
+  const handleSave = async () => {
+    if (!newUsername.trim()) {
+      alert('El nombre de usuario no puede estar vacío');
+      return;
+    }
 
-            onSave(username);
-            onClose();
-        }
-    };
+    setIsLoading(true);
+    try {
+      await onSave(newUsername.trim());
+      onClose();
+    } catch (error) {
+      console.error('Error guardando nombre de usuario:', error);
+      alert('Error al guardar el nombre de usuario');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const handleClose = () => {
-        setUsername(currentUsername);
-        onClose();
-    };
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    }
+  };
 
-    return (
-        <Modal
-            show={show}
-            onHide={handleClose}
-            centered
-            className="font-[Inter]"
-        >
-            <Modal.Header
-                closeButton
-                className="border-0"
-                style={{ backgroundColor: 'var(--color-cuarto)' }}
-            >
-                <Modal.Title className="text-lg font-semibold text-gray-800">
-                    Editar Nombre de Usuario
-                </Modal.Title>
-            </Modal.Header>
+  if (!show) return null;
 
-            <Modal.Body
-                className="p-6"
-                style={{ backgroundColor: 'var(--fondo)' }}
-            >
-                <Form>
-                    <Form.Group>
-                        <Form.Label className="text-sm font-medium text-gray-700 mb-2">
-                            Nuevo nombre de usuario
-                        </Form.Label>
-                        <Form.Control
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            placeholder="Ingresa tu nuevo nombre"
-                        />
-                    </Form.Group>
-                </Form>
-            </Modal.Body>
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 className="text-lg font-semibold mb-4">Editar Nombre de Usuario</h3>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Nombre de Usuario
+          </label>
+          <input
+            type="text"
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            onKeyPress={handleKeyPress}
+            className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Ingresa tu nombre de usuario"
+            disabled={isLoading}
+          />
+        </div>
 
-            <Modal.Footer
-                className="border-0 gap-2"
-                style={{ backgroundColor: 'var(--fondo)' }}
-            >
-                <Button
-                    variant="secondary"
-                    onClick={handleClose}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-                >
-                    Cancelar
-                </Button>
-                <Button
-                    onClick={handleSave}
-                    className="px-4 py-2 rounded-lg transition-colors text-white border-0"
-                    style={{ backgroundColor: 'var(--color-secundario)' }}
-                    onMouseOver={(e) => e.target.style.backgroundColor = 'var(--boton-House)'}
-                    onMouseOut={(e) => e.target.style.backgroundColor = 'var(--color-secundario)'}
-                >
-                    Guardar
-                </Button>
-            </Modal.Footer>
-        </Modal>
-    );
-};
-
-export default EditUsernameModal; 
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            disabled={isLoading}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

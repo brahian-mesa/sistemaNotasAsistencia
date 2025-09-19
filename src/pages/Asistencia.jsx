@@ -3,6 +3,9 @@ import { ChevronDownIcon, ChevronUpIcon, UserGroupIcon, CalendarIcon, ChartBarIc
 import PageContainer from '../components/PageContainer'
 import * as XLSX from 'xlsx'
 import db from '../utils/database'
+import auth from '../utils/auth'
+import supabase from '../utils/supabase'
+import { testAttendanceSave, testMultipleAttendance } from '../utils/test-attendance'
 
 export default function Asistencia() {
     const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0])
@@ -10,8 +13,12 @@ export default function Asistencia() {
     const [showEstadisticas, setShowEstadisticas] = useState(false)
     const [diasFestivos, setDiasFestivos] = useState([])
 
-    // Definición de períodos académicos con fechas específicas
-    const periodosAcademicos = {
+    // Obtener períodos académicos de la base de datos
+    const [periodosAcademicos, setPeriodosAcademicos] = useState({})
+
+    
+    // Formatear períodos para mostrar - valores por defecto
+    const periodosFormateados = {
         1: {
             nombre: 'Período 1',
             fechaInicio: '2025-01-27',
@@ -43,17 +50,20 @@ export default function Asistencia() {
         const hoy = new Date()
         const fechaHoy = hoy.toISOString().split('T')[0] // Formato YYYY-MM-DD
 
+        // Usar periodosFormateados como fallback
+        const periodos = Object.keys(periodosAcademicos).length > 0 ? periodosAcademicos : periodosFormateados
+
         for (let periodo = 1; periodo <= 4; periodo++) {
-            const { fechaInicio, fechaFin } = periodosAcademicos[periodo]
-            if (fechaHoy >= fechaInicio && fechaHoy <= fechaFin) {
+            const periodoData = periodos[periodo]
+            if (periodoData && fechaHoy >= periodoData.fechaInicio && fechaHoy <= periodoData.fechaFin) {
                 return periodo
             }
         }
 
         // Si no está en ningún período, determinar el más cercano
         for (let periodo = 1; periodo <= 4; periodo++) {
-            const { fechaInicio } = periodosAcademicos[periodo]
-            if (fechaHoy < fechaInicio) {
+            const periodoData = periodos[periodo]
+            if (periodoData && fechaHoy < periodoData.fechaInicio) {
                 return periodo
             }
         }
@@ -77,6 +87,7 @@ export default function Asistencia() {
 
     // Estados para indicador de guardado automático
     const [autoSaveStatus, setAutoSaveStatus] = useState('')
+    const [actualizandoEstadisticas, setActualizandoEstadisticas] = useState(false)
 
     // Función para mostrar estado de guardado
     const mostrarEstadoGuardado = (mensaje) => {
@@ -86,9 +97,15 @@ export default function Asistencia() {
 
     // Función para filtrar asistencias por período académico
     const filtrarAsistenciasPorPeriodo = (asistencias, periodo) => {
-        const { fechaInicio, fechaFin } = periodosAcademicos[periodo]
+        const periodos = Object.keys(periodosAcademicos).length > 0 ? periodosAcademicos : periodosFormateados
+        const periodoData = periodos[periodo]
+
+        if (!periodoData) {
+            return asistencias // Si no hay datos del período, devolver todas las asistencias
+        }
+
         return asistencias.filter(asistencia =>
-            asistencia.fecha >= fechaInicio && asistencia.fecha <= fechaFin
+            asistencia.fecha >= periodoData.fechaInicio && asistencia.fecha <= periodoData.fechaFin
         )
     }
 
@@ -125,8 +142,11 @@ export default function Asistencia() {
     }
 
     // Función para agregar estudiante (igual que en Materias)
-    const handleAddStudent = () => {
-        if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) return
+    const handleAddStudent = async () => {
+        if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) {
+            mostrarEstadoGuardado('❌ Por favor completa todos los campos')
+            return
+        }
 
         try {
             let codigoFinal = studentForm.codigo.trim()
@@ -141,40 +161,72 @@ export default function Asistencia() {
 
             const nuevoEstudiante = {
                 nombre: studentForm.nombre.trim(),
-                codigo: codigoFinal
+                codigo: codigoFinal,
+                grado: auth.getCurrentUser()?.grado || 'Sin especificar'
             }
 
-            const estudianteGuardado = db.guardarEstudiante(nuevoEstudiante)
+            const estudianteGuardado = await db.guardarEstudiante(nuevoEstudiante)
+
+            // Actualizar lista local
             setEstudiantes(prev => [...prev, estudianteGuardado].sort((a, b) => a.codigo.localeCompare(b.codigo)))
             setStudentForm({ nombre: '', codigo: '' })
             setShowAddStudentModal(false)
-            console.log('✅ Estudiante agregado:', estudianteGuardado)
+
             mostrarEstadoGuardado(`✅ Estudiante agregado: ${estudianteGuardado.codigo}`)
         } catch (error) {
-            console.error('❌ Error agregando estudiante:', error)
-            alert('Error al agregar el estudiante')
+            mostrarEstadoGuardado(`❌ Error al agregar estudiante: ${error.message}`)
         }
     }
 
     // Cargar datos al inicializar - igual que en Materias
     useEffect(() => {
         cargarDatos()
+        cargarPeriodosAcademicos()
     }, [])
 
-    const cargarDatos = () => {
+    const cargarPeriodosAcademicos = async () => {
         try {
-            const materiasDB = db.getMaterias()
-            const estudiantesDB = db.getEstudiantes()
-
-            setMaterias(materiasDB)
-            // Ordenar estudiantes por código automáticamente
-            setEstudiantes(estudiantesDB.sort((a, b) => a.codigo.localeCompare(b.codigo)))
-
-            console.log('✅ Datos cargados desde la base de datos:')
-            console.log('📚 Materias:', materiasDB.length)
-            console.log('👥 Estudiantes:', estudiantesDB.length)
+            const periodos = await db.getPeriodosAcademicos()
+            setPeriodosAcademicos(periodos)
         } catch (error) {
-            console.error('❌ Error cargando datos:', error)
+
+        }
+    }
+
+    const cargarDatos = async () => {
+        try {
+            const currentUser = auth.getCurrentUser()
+
+            if (!currentUser) {
+                console.error('❌ No hay usuario autenticado')
+                mostrarEstadoGuardado('❌ No hay usuario autenticado')
+                return
+            }
+
+
+            // Cargar datos en paralelo para mejor rendimiento
+            const [materiasDB, estudiantesDB] = await Promise.all([
+                db.getMaterias(),
+                db.getEstudiantes()
+            ])
+
+            // Las materias ya vienen filtradas por usuario_id desde database.js
+            const materiasUsuario = materiasDB || []
+
+            // Los estudiantes ya vienen filtradas por usuario_id desde database.js
+            const estudiantesUsuario = estudiantesDB || []
+
+            setMaterias(materiasUsuario)
+            // Ordenar estudiantes por código automáticamente
+            setEstudiantes(estudiantesUsuario.sort((a, b) => a.codigo.localeCompare(b.codigo)))
+
+
+            
+
+           
+
+        } catch (error) {
+            mostrarEstadoGuardado(`❌ Error cargando datos: ${error.message}`)
         }
     }
 
@@ -191,20 +243,18 @@ export default function Asistencia() {
         return materia.horario && materia.horario.toLowerCase().includes(diaSemana)
     })
 
-    // Obtener asistencias desde localStorage - igual que notas en Materias
+    // Obtener asistencias desde Supabase
     useEffect(() => {
-        const asistenciasGuardadas = localStorage.getItem('sistema_escolar_asistencias')
-        if (asistenciasGuardadas) {
+        const cargarAsistenciasFecha = async () => {
             try {
-                const todasAsistencias = JSON.parse(asistenciasGuardadas)
+                const asistenciasDB = await db.getAsistencia(fechaSeleccionada)
 
                 // Convertir a formato del estado local para la fecha seleccionada
                 const asistenciasFormateadas = {}
-                const asistenciasFecha = todasAsistencias.filter(a => a.fecha === fechaSeleccionada)
 
-                // Agrupar por estudiante
+                // Agrupar por estudiante (tomar el primer estado encontrado para cada estudiante)
                 const asistenciasPorEstudiante = {}
-                asistenciasFecha.forEach(asistencia => {
+                asistenciasDB.forEach(asistencia => {
                     if (!asistenciasPorEstudiante[asistencia.estudiante_id]) {
                         asistenciasPorEstudiante[asistencia.estudiante_id] = asistencia.estado
                     }
@@ -221,18 +271,33 @@ export default function Asistencia() {
                 })
 
                 setAsistencias(asistenciasFormateadas)
-                console.log('✅ Asistencias cargadas:', Object.keys(asistenciasFormateadas).length)
             } catch (error) {
-                console.error('❌ Error cargando asistencias:', error)
+                mostrarEstadoGuardado(`❌ Error cargando asistencias: ${error.message}`)
             }
         }
+
+        cargarAsistenciasFecha()
     }, [fechaSeleccionada])
 
-    // Manejar cambio de asistencia - guardado automático como en Materias
-    const manejarAsistencia = (estudianteId, estado) => {
+    // Manejar cambio de asistencia - guardado automático en Supabase
+    const manejarAsistencia = async (estudianteId, estado) => {
         const clave = `${fechaSeleccionada}-${estudianteId}`
 
-        // Actualizar estado local
+        // Validar datos antes de procesar
+        if (!estudianteId || !estado || !fechaSeleccionada) {
+            console.error('❌ Datos inválidos para asistencia:', { estudianteId, estado, fechaSeleccionada })
+            mostrarEstadoGuardado('❌ Error: Datos inválidos')
+            return
+        }
+
+        // Validar que hay materias programadas para el día
+        if (materiasDelDia.length === 0) {
+            console.error('❌ No hay materias programadas para este día')
+            mostrarEstadoGuardado('❌ No hay materias programadas')
+            return
+        }
+
+        // Actualizar estado local primero para respuesta inmediata
         setAsistencias(prev => ({
             ...prev,
             [clave]: {
@@ -242,36 +307,36 @@ export default function Asistencia() {
             }
         }))
 
-        // Guardar automáticamente en localStorage - igual que en Materias
+        // Guardar automáticamente en Supabase usando el método individual más eficiente
         try {
-            // Obtener todas las asistencias existentes
-            const asistenciasExistentes = JSON.parse(localStorage.getItem('sistema_escolar_asistencias') || '[]')
+            // Guardar asistencia para cada materia del día usando el método individual
+            const promesasGuardado = materiasDelDia.map(materia =>
+                db.guardarAsistenciaIndividual(
+                    parseInt(estudianteId),
+                    materia.id,
+                    fechaSeleccionada,
+                    estado
+                )
+            );
 
-            // Eliminar asistencias existentes para este estudiante en esta fecha
-            const asistenciasFiltradas = asistenciasExistentes.filter(a =>
-                !(a.estudiante_id === parseInt(estudianteId) && a.fecha === fechaSeleccionada)
-            )
+            // Esperar a que todas las asistencias se guarden
+            await Promise.all(promesasGuardado);
 
-            // Crear nuevas asistencias para cada materia del día
-            const nuevasAsistencias = materiasDelDia.map(materia => ({
-                id: Date.now() + Math.random(),
-                estudiante_id: parseInt(estudianteId),
-                materia_id: materia.id,
-                fecha: fechaSeleccionada,
-                estado: estado,
-                created_at: new Date().toISOString()
-            }))
+            const estadoTexto = estado === 'presente' ? '✅ Presente' : '❌ Ausente'
+            mostrarEstadoGuardado(`${estadoTexto} - Guardado correctamente`)
 
-            // Guardar todas las asistencias
-            const todasLasAsistencias = [...asistenciasFiltradas, ...nuevasAsistencias]
-            localStorage.setItem('sistema_escolar_asistencias', JSON.stringify(todasLasAsistencias))
-
-            mostrarEstadoGuardado('✅ Guardado automáticamente')
-            console.log(`✅ Asistencia guardada: ${estado} para estudiante ${estudianteId}`)
+            // Actualizar estadísticas inmediatamente después de guardar
+            await actualizarEstadisticasAutomatico()
 
         } catch (error) {
-            console.error('❌ Error guardando asistencia:', error)
-            mostrarEstadoGuardado('❌ Error al guardar')
+            mostrarEstadoGuardado(`❌ Error al guardar: ${error.message}`)
+
+            // Revertir cambio local si hay error
+            setAsistencias(prev => {
+                const newAsistencias = { ...prev }
+                delete newAsistencias[clave]
+                return newAsistencias
+            })
         }
     }
 
@@ -281,49 +346,63 @@ export default function Asistencia() {
         return asistencias[clave]?.estado || ''
     }
 
-    // Calcular estadísticas de faltas por período
-    const calcularEstadisticasFaltas = () => {
+    // Calcular estadísticas de faltas por período - MÉTODO MEJORADO
+    const calcularEstadisticasFaltas = async () => {
         try {
-            const todasAsistencias = JSON.parse(localStorage.getItem('sistema_escolar_asistencias') || '[]')
-            // Filtrar asistencias por período seleccionado
-            const asistenciasDelPeriodo = filtrarAsistenciasPorPeriodo(todasAsistencias, periodoSeleccionado)
+            const periodoInfo = periodosAcademicos[periodoSeleccionado] || periodosFormateados[periodoSeleccionado]
+
+
+            // Obtener todas las asistencias del período desde Supabase
+            const { data: asistenciasDB, error } = await supabase
+                .from('asistencias')
+                .select('*')
+                .gte('fecha', periodoInfo.fechaInicio)
+                .lte('fecha', periodoInfo.fechaFin)
+                .eq('usuario_id', auth.getCurrentUser()?.id);
+
+            if (error) {
+                console.error('❌ Error obteniendo asistencias:', error);
+                return [];
+            }
+
+
             const estadisticas = []
 
             estudiantes.forEach(estudiante => {
                 const faltasPorMateria = {}
+                const asistenciasPorMateria = {}
 
-                // Inicializar contadores
+                // Inicializar contadores para todas las materias
                 materias.forEach(materia => {
                     faltasPorMateria[materia.codigo] = 0
+                    asistenciasPorMateria[materia.codigo] = 0
                 })
 
-                // Contar faltas - UNA por día, no por materia - SOLO del período seleccionado
-                const fechasConFaltas = new Set()
-                asistenciasDelPeriodo.forEach(asistencia => {
-                    if (asistencia.estudiante_id === estudiante.id && asistencia.estado === 'ausente') {
-                        fechasConFaltas.add(asistencia.fecha)
+                // Procesar cada asistencia del estudiante
+                asistenciasDB.forEach(asistencia => {
+                    if (asistencia.estudiante_id === estudiante.id) {
+                        const materia = materias.find(m => m.id === asistencia.materia_id)
+                        if (materia) {
+                            asistenciasPorMateria[materia.codigo]++
+                            if (asistencia.estado === 'ausente') {
+                                faltasPorMateria[materia.codigo]++
+                            }
+                        }
                     }
                 })
 
-                // Para cada fecha con falta, incrementar SOLO las materias de ese día
-                fechasConFaltas.forEach(fecha => {
-                    const diaSemana = obtenerDiaSemana(fecha)
-                    const materiasDeEseDia = materias.filter(materia =>
-                        materia.horario && materia.horario.toLowerCase().includes(diaSemana)
-                    )
+                // Calcular total de faltas (suma de todas las materias)
+                const totalFaltas = Object.values(faltasPorMateria).reduce((sum, faltas) => sum + faltas, 0)
+                const totalAsistencias = Object.values(asistenciasPorMateria).reduce((sum, asistencias) => sum + asistencias, 0)
 
-                    materiasDeEseDia.forEach(materia => {
-                        if (faltasPorMateria[materia.codigo] !== undefined) {
-                            faltasPorMateria[materia.codigo]++
-                        }
-                    })
-                })
 
                 estadisticas.push({
                     estudiante: estudiante.nombre,
                     codigoEstudiante: estudiante.codigo,
                     faltasPorMateria: faltasPorMateria,
-                    totalFaltas: fechasConFaltas.size
+                    asistenciasPorMateria: asistenciasPorMateria,
+                    totalFaltas: totalFaltas,
+                    totalAsistencias: totalAsistencias
                 })
             })
 
@@ -334,67 +413,201 @@ export default function Asistencia() {
         }
     }
 
-    // Exportar a Excel con asistencias del período seleccionado
-    const exportarAsistenciaExcel = () => {
-        try {
-            // Obtener todas las asistencias y filtrar por período
-            const todasAsistencias = JSON.parse(localStorage.getItem('sistema_escolar_asistencias') || '[]')
-            const asistenciasDelPeriodo = filtrarAsistenciasPorPeriodo(todasAsistencias, periodoSeleccionado)
+    // Exportar estadísticas a Excel - MEJORADO
+    const exportarEstadisticasExcel = async () => {
 
-            if (asistenciasDelPeriodo.length === 0) {
-                alert(`⚠️ No hay asistencias guardadas para el ${periodosAcademicos[periodoSeleccionado].nombre}.`)
+        if (!estadisticas || estadisticas.length === 0) {
+            alert('⚠️ No hay estadísticas para exportar. Primero marca algunas asistencias.')
+            return
+        }
+
+        try {
+            const periodoInfoExport = periodosAcademicos[periodoSeleccionado] || periodosFormateados[periodoSeleccionado]
+            const currentUser = auth.getCurrentUser()
+            const wb = XLSX.utils.book_new()
+
+            // Calcular totales generales
+            const totalFaltasGeneral = estadisticas.reduce((sum, est) => sum + est.totalFaltas, 0)
+            const totalAsistenciasGeneral = estadisticas.reduce((sum, est) => sum + est.totalAsistencias, 0)
+
+            // Crear datos del reporte
+            const datosHoja = [
+                ['INSTITUCIÓN EDUCATIVA NUESTRA SEÑORA DE LOS DOLORES'],
+                ['REPORTE DE ESTADÍSTICAS DE FALTAS POR MATERIA'],
+                [`Grado: ${currentUser?.grado || '5B'}`],
+                [`Docente: ${currentUser?.nombre || 'Sin especificar'}`],
+                [],
+                ['INFORMACIÓN DEL PERÍODO'],
+                ['Período Académico:', `${periodoInfoExport?.nombre || `Período ${periodoSeleccionado}`}`],
+                ['Fechas:', `${periodoInfoExport?.fechaInicio || 'N/A'} al ${periodoInfoExport?.fechaFin || 'N/A'}`],
+                ['Fecha de reporte:', new Date().toLocaleDateString('es-ES')],
+                [],
+                ['RESUMEN GENERAL'],
+                ['Total de estudiantes:', estadisticas.length],
+                ['Total de faltas en el período:', totalFaltasGeneral],
+                ['Total de asistencias registradas:', totalAsistenciasGeneral],
+                ['Porcentaje de faltas:', totalAsistenciasGeneral > 0 ? `${((totalFaltasGeneral / totalAsistenciasGeneral) * 100).toFixed(1)}%` : '0%'],
+                [],
+                ['DETALLE POR ESTUDIANTE Y MATERIA']
+            ]
+
+            // Encabezados de la tabla
+            const encabezados = ['Código', 'Estudiante']
+            materias.forEach(materia => {
+                encabezados.push(materia.nombre)
+            })
+            encabezados.push('Total Faltas', 'Total Asistencias', '% Faltas')
+            datosHoja.push(encabezados)
+
+            // Datos de estudiantes
+            estadisticas.forEach(est => {
+                const filaEstudiante = [est.codigoEstudiante, est.estudiante]
+
+                // Agregar faltas por cada materia
+                materias.forEach(materia => {
+                    filaEstudiante.push(est.faltasPorMateria[materia.codigo] || 0)
+                })
+
+                // Totales del estudiante
+                filaEstudiante.push(est.totalFaltas)
+                filaEstudiante.push(est.totalAsistencias)
+                
+                // Porcentaje de faltas del estudiante
+                const porcentajeFaltas = est.totalAsistencias > 0 ? 
+                    ((est.totalFaltas / est.totalAsistencias) * 100).toFixed(1) : '0'
+                filaEstudiante.push(`${porcentajeFaltas}%`)
+
+                datosHoja.push(filaEstudiante)
+            })
+
+            // Agregar fila de totales por materia
+            const filaTotales = ['TOTALES', '']
+            materias.forEach(materia => {
+                const totalMateria = estadisticas.reduce((sum, est) => 
+                    sum + (est.faltasPorMateria[materia.codigo] || 0), 0)
+                filaTotales.push(totalMateria)
+            })
+            filaTotales.push(totalFaltasGeneral, totalAsistenciasGeneral, '')
+            datosHoja.push(filaTotales)
+
+            // Crear worksheet
+            const ws = XLSX.utils.aoa_to_sheet(datosHoja)
+
+            // Ajustar ancho de columnas
+            const colWidths = [
+                { wch: 12 }, // Código
+                { wch: 30 }, // Estudiante
+                ...materias.map(() => ({ wch: 15 })), // Materias
+                { wch: 12 }, // Total Faltas
+                { wch: 15 }, // Total Asistencias
+                { wch: 10 }  // % Faltas
+            ]
+            ws['!cols'] = colWidths
+
+            // Agregar hoja
+            XLSX.utils.book_append_sheet(wb, ws, 'Estadísticas Faltas')
+
+            // Nombre del archivo
+            const nombrePeriodo = (periodoInfoExport?.nombre || `Período ${periodoSeleccionado}`).toLowerCase().replace(/\s+/g, '_')
+            const fechaReporte = new Date().toISOString().split('T')[0]
+            const nombreArchivo = `estadisticas_faltas_${nombrePeriodo}_${fechaReporte}.xlsx`
+
+            // Descargar
+            XLSX.writeFile(wb, nombreArchivo)
+
+
+        } catch (error) {
+            alert(`❌ Error al exportar: ${error.message}`)
+        }
+    }
+
+    // Exportar a Excel con asistencias del período seleccionado - CORREGIDO
+    const exportarAsistenciaExcel = async () => {
+        try {
+
+            const periodoInfoRegistro = periodosAcademicos[periodoSeleccionado] || periodosFormateados[periodoSeleccionado]
+            const currentUser = auth.getCurrentUser()
+
+            // Obtener todas las asistencias del período desde Supabase
+            const { data: todasAsistencias, error } = await supabase
+                .from('asistencias')
+                .select('*')
+                .gte('fecha', periodoInfoRegistro.fechaInicio)
+                .lte('fecha', periodoInfoRegistro.fechaFin)
+                .eq('usuario_id', currentUser?.id)
+
+            if (error) {
+                console.error('❌ Error obteniendo asistencias:', error)
+                alert(`❌ Error obteniendo datos: ${error.message}`)
                 return
             }
 
-            // Obtener todas las fechas únicas del período
-            const fechasUnicas = [...new Set(asistenciasDelPeriodo.map(a => a.fecha))].sort()
+            if (!todasAsistencias || todasAsistencias.length === 0) {
+                const nombrePeriodo = periodosAcademicos[periodoSeleccionado]?.nombre || `Período ${periodoSeleccionado}`
+                alert(`⚠️ No hay asistencias guardadas para el ${nombrePeriodo}.\n\nPrimero marca algunas asistencias en diferentes fechas.`)
+                return
+            }
 
-            // Convertir asistencias a formato fácil de usar
+
+            
+            // Obtener todas las fechas únicas del período y ordenarlas
+            const fechasUnicas = [...new Set(todasAsistencias.map(a => a.fecha))].sort()
+
+            // Convertir asistencias a formato fácil de usar (agrupar por estudiante y fecha)
             const asistenciasFormateadas = {}
-            asistenciasDelPeriodo.forEach(asistencia => {
+            todasAsistencias.forEach(asistencia => {
                 const clave = `${asistencia.fecha}-${asistencia.estudiante_id}`
-                asistenciasFormateadas[clave] = asistencia.estado
+                // Si ya existe, mantener el estado (priorizar ausente sobre presente)
+                if (!asistenciasFormateadas[clave] || asistencia.estado === 'ausente') {
+                    asistenciasFormateadas[clave] = asistencia.estado
+                }
             })
 
-            // Información del período seleccionado
-            const periodoInfo = periodosAcademicos[periodoSeleccionado]
+            // Crear datos del reporte
+            const datosHoja = [
+                ['INSTITUCIÓN EDUCATIVA NUESTRA SEÑORA DE LOS DOLORES'],
+                ['REGISTRO DE ASISTENCIA'],
+                [`Grado: ${currentUser?.grado || '5B'}`],
+                [`Docente: ${currentUser?.nombre || 'Sin especificar'}`],
+                [],
+                ['INFORMACIÓN DEL PERÍODO'],
+                ['Período Académico:', `${periodoInfoRegistro?.nombre || `Período ${periodoSeleccionado}`}`],
+                ['Fechas:', `${periodoInfoRegistro?.fechaInicio || 'N/A'} al ${periodoInfoRegistro?.fechaFin || 'N/A'}`],
+                ['Fecha de reporte:', new Date().toLocaleDateString('es-ES')],
+                [],
+                ['LEYENDA: X = Presente, F = Falta, (vacío) = Sin registro'],
+                []
+            ]
 
-            // Encabezado institucional
-            const datosHoja = []
-            datosHoja.push(['🏫', 'Institución Educativa Nuestra Señora De los Dolores'])
-            datosHoja.push(['', `REGISTRO DE ASISTENCIA - ${periodoInfo.nombre.toUpperCase()}`])
-            datosHoja.push(['', 'Sede Salvador Duque, grado 5B'])
-            datosHoja.push(['', `Período académico: ${periodoInfo.descripcion}`])
-            datosHoja.push(['', `Fechas del período: ${periodoInfo.fechaInicio} al ${periodoInfo.fechaFin}`])
-            datosHoja.push(['', `Días con registro: ${fechasUnicas.length}`])
-            datosHoja.push([])
-
-            // Encabezados de tabla
-            const encabezados = ['N°', 'NOMBRE DEL ESTUDIANTE']
+            // Crear encabezados con fechas
+            const encabezados = ['N°', 'CÓDIGO', 'NOMBRE DEL ESTUDIANTE']
             fechasUnicas.forEach(fecha => {
                 const fechaObj = new Date(fecha + 'T12:00:00')
-                encabezados.push(fechaObj.getDate().toString())
+                const dia = fechaObj.getDate()
+                const mes = fechaObj.getMonth() + 1
+                encabezados.push(`${dia}/${mes}`)
             })
-            encabezados.push('Total Faltas')
+            encabezados.push('TOTAL FALTAS')
+
             datosHoja.push(encabezados)
 
             // Datos de estudiantes
             estudiantes.forEach((estudiante, index) => {
-                const filaEstudiante = [index + 1, estudiante.nombre]
+                const filaEstudiante = [index + 1, estudiante.codigo, estudiante.nombre]
                 let totalFaltas = 0
 
                 fechasUnicas.forEach(fecha => {
                     const claveAsistencia = `${fecha}-${estudiante.id}`
                     const estadoAsistencia = asistenciasFormateadas[claveAsistencia]
 
-                    let valorCelda = ''
                     if (estadoAsistencia === 'presente') {
-                        valorCelda = 'X'
+                        filaEstudiante.push('X') // Presente
                     } else if (estadoAsistencia === 'ausente') {
-                        valorCelda = 'F'
+                        filaEstudiante.push('F') // Falta
                         totalFaltas++
+                    } else {
+                        filaEstudiante.push('') // Sin registro
                     }
-                    filaEstudiante.push(valorCelda)
                 })
 
                 filaEstudiante.push(totalFaltas)
@@ -408,24 +621,26 @@ export default function Asistencia() {
             // Ajustar ancho de columnas
             const colWidths = [
                 { wch: 5 },  // N°
-                { wch: 30 }, // Nombre
-                ...fechasUnicas.map(() => ({ wch: 4 })), // Días
-                { wch: 8 }   // Total
+                { wch: 12 }, // Código
+                { wch: 35 }, // Nombre
+                ...fechasUnicas.map(() => ({ wch: 8 })), // Fechas
+                { wch: 12 }  // Total
             ]
             ws['!cols'] = colWidths
 
-            XLSX.utils.book_append_sheet(wb, ws, `Asistencia ${periodoInfo.nombre}`)
+            XLSX.utils.book_append_sheet(wb, ws, 'Registro Asistencia')
 
             // Nombre del archivo
-            const nombreArchivo = `asistencia_${periodoInfo.nombre.toLowerCase().replace(' ', '_')}_${periodoInfo.fechaInicio}_${periodoInfo.fechaFin}.xlsx`
+            const nombrePeriodo = (periodoInfoRegistro?.nombre || `período_${periodoSeleccionado}`).toLowerCase().replace(/\s+/g, '_')
+            const fechaReporte = new Date().toISOString().split('T')[0]
+            const nombreArchivo = `registro_asistencia_${nombrePeriodo}_${fechaReporte}.xlsx`
 
+            // Descargar archivo
             XLSX.writeFile(wb, nombreArchivo)
 
-            alert(`✅ EXCEL EXPORTADO EXITOSAMENTE!\n\n📊 Resumen del ${periodoInfo.nombre}:\n• ${fechasUnicas.length} días con registro\n• ${asistenciasDelPeriodo.length} registros del período\n• Período: ${periodoInfo.descripcion}\n\n💾 Archivo: ${nombreArchivo}`)
 
         } catch (error) {
-            console.error('❌ Error exportando Excel:', error)
-            alert('❌ Error al exportar archivo Excel')
+            alert(`❌ Error al exportar archivo Excel: ${error.message}`)
         }
     }
 
@@ -449,14 +664,69 @@ export default function Asistencia() {
 
     const [estadisticas, setEstadisticas] = useState([])
 
-    // Recalcular estadísticas cuando cambie el período seleccionado
+    // Función para actualizar estadísticas manualmente
+    const actualizarEstadisticasManual = async () => {
+        try {
+            setActualizandoEstadisticas(true);
+            const nuevasEstadisticas = await calcularEstadisticasFaltas()
+            setEstadisticas(nuevasEstadisticas)
+
+            // Mostrar resumen de estadísticas actualizadas
+            const totalFaltas = nuevasEstadisticas.reduce((sum, est) => sum + est.totalFaltas, 0);
+            const totalAsistencias = nuevasEstadisticas.reduce((sum, est) => sum + est.totalAsistencias, 0);
+            mostrarEstadoGuardado(`📊 Stats actualizadas: ${totalFaltas} faltas de ${totalAsistencias} registros`);
+
+            return nuevasEstadisticas;
+        } catch (error) {
+            console.error('❌ Error actualizando estadísticas:', error);
+            mostrarEstadoGuardado('❌ Error actualizando estadísticas');
+            return [];
+        } finally {
+            setActualizandoEstadisticas(false);
+        }
+    }
+
+    // Función para actualizar estadísticas automáticamente (sin mostrar loading)
+    const actualizarEstadisticasAutomatico = async () => {
+        try {
+            const nuevasEstadisticas = await calcularEstadisticasFaltas()
+            setEstadisticas(nuevasEstadisticas)
+            return nuevasEstadisticas;
+        } catch (error) {
+            console.error('❌ Error actualizando estadísticas automáticamente:', error);
+            return [];
+        }
+    }
+
+    // Recalcular estadísticas cuando cambie el período seleccionado, estudiantes, materias o asistencias
     useEffect(() => {
-        const nuevasEstadisticas = calcularEstadisticasFaltas()
-        setEstadisticas(nuevasEstadisticas)
+        const actualizarEstadisticas = async () => {
+            const nuevasEstadisticas = await calcularEstadisticasFaltas()
+            setEstadisticas(nuevasEstadisticas)
+        }
+
+        // Solo recalcular si tenemos datos necesarios
+        if (estudiantes.length > 0 && materias.length > 0) {
+            actualizarEstadisticas()
+        }
     }, [periodoSeleccionado, estudiantes, materias])
 
+    // Recalcular estadísticas cuando cambien las asistencias (para actualización automática)
+    useEffect(() => {
+        const actualizarEstadisticasPorAsistencias = async () => {
+            if (estudiantes.length > 0 && materias.length > 0 && estadisticas.length > 0) {
+                const nuevasEstadisticas = await calcularEstadisticasFaltas()
+                setEstadisticas(nuevasEstadisticas)
+            }
+        }
+
+        // Usar un pequeño delay para evitar recálculos excesivos
+        const timeoutId = setTimeout(actualizarEstadisticasPorAsistencias, 500)
+        return () => clearTimeout(timeoutId)
+    }, [asistencias])
+
     return (
-        <PageContainer title="Control de Asistencia - Grado 5B" subtitle="Registro diario de asistencia">
+        <PageContainer title={`Control de Asistencia - Grado ${auth.getCurrentUser()?.grado || '5B'}`} subtitle="Registro diario de asistencia">
             <div className="space-y-6 p-4 md:p-6 min-h-screen pb-6">
 
                 {/* Indicador de guardado automático */}
@@ -496,19 +766,76 @@ export default function Asistencia() {
                                 onChange={(e) => setPeriodoSeleccionado(parseInt(e.target.value))}
                                 className="px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
                             >
-                                {Object.entries(periodosAcademicos).map(([num, periodo]) => (
-                                    <option key={num} value={num}>
-                                        {periodo.nombre} ({periodo.descripcion})
-                                    </option>
-                                ))}
+                                {Object.keys(periodosAcademicos).length > 0 ? (
+                                    Object.entries(periodosAcademicos).map(([num, periodo]) => (
+                                        <option key={num} value={num}>
+                                            {periodo.nombre} ({periodo.fechaInicio} al {periodo.fechaFin})
+                                        </option>
+                                    ))
+                                ) : (
+                                    <>
+                                        <option value={1}>Período 1 (2025-01-27 al 2025-04-04)</option>
+                                        <option value={2}>Período 2 (2025-04-07 al 2025-06-16)</option>
+                                        <option value={3}>Período 3 (2025-07-07 al 2025-09-12)</option>
+                                        <option value={4}>Período 4 (2025-09-15 al 2025-11-28)</option>
+                                    </>
+                                )}
                             </select>
+                            <button
+                                onClick={() => {
+                                    const fechaHoy = new Date().toISOString().split('T')[0]
+                                    let periodoActual = 4
+
+                                    if (fechaHoy >= '2025-01-27' && fechaHoy <= '2025-04-04') periodoActual = 1
+                                    else if (fechaHoy >= '2025-04-07' && fechaHoy <= '2025-06-16') periodoActual = 2
+                                    else if (fechaHoy >= '2025-07-07' && fechaHoy <= '2025-09-12') periodoActual = 3
+                                    else if (fechaHoy >= '2025-09-15' && fechaHoy <= '2025-11-28') periodoActual = 4
+
+                                    setPeriodoSeleccionado(periodoActual)
+                                    setFechaSeleccionada(fechaHoy)
+                                    mostrarEstadoGuardado(`📅 Período actual: ${periodoActual}`)
+                                }}
+                                className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 text-sm"
+                                title="Ir al período actual"
+                            >
+                                🎯 Hoy
+                            </button>
                         </div>
                     </div>
                     <div className="mt-3 p-3 bg-purple-50 rounded-lg">
                         <p className="text-sm text-purple-700">
-                            <strong>Período seleccionado:</strong> {periodosAcademicos[periodoSeleccionado].nombre}
-                            <span className="ml-2">del {periodosAcademicos[periodoSeleccionado].fechaInicio} al {periodosAcademicos[periodoSeleccionado].fechaFin}</span>
+                            <strong>Período seleccionado:</strong> {
+                                periodosAcademicos[periodoSeleccionado]?.nombre ||
+                                `Período ${periodoSeleccionado}`
+                            }
+                            <span className="ml-2">del {
+                                periodosAcademicos[periodoSeleccionado]?.fechaInicio ||
+                                periodosFormateados[periodoSeleccionado]?.fechaInicio
+                            } al {
+                                    periodosAcademicos[periodoSeleccionado]?.fechaFin ||
+                                    periodosFormateados[periodoSeleccionado]?.fechaFin
+                                }</span>
                         </p>
+                        {Object.keys(periodosAcademicos).length === 0 && (
+                            <div className="mt-2 p-2 bg-yellow-100 border border-yellow-300 rounded">
+                                <p className="text-xs text-yellow-700">
+                                    ⚠️ No hay períodos académicos configurados.
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await db.guardarPeriodosAcademicos(periodosFormateados)
+                                                window.location.reload()
+                                            } catch (error) {
+                                                alert('Error al inicializar períodos')
+                                            }
+                                        }}
+                                        className="ml-1 text-yellow-800 underline hover:text-yellow-900"
+                                    >
+                                        Inicializar períodos por defecto
+                                    </button>
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -538,6 +865,14 @@ export default function Asistencia() {
                             <p className="text-purple-700">
                                 <strong>Materias:</strong> {materiasDelDia.map(m => m.nombre).join(', ')}
                             </p>
+                            <div className="mt-2 flex gap-4 text-sm">
+                                <span className="text-green-600">
+                                    ✅ Presentes: {estudiantes.filter(est => obtenerAsistencia(est.id) === 'presente').length}
+                                </span>
+                                <span className="text-red-600">
+                                    ❌ Ausentes: {estudiantes.filter(est => obtenerAsistencia(est.id) === 'ausente').length}
+                                </span>
+                            </div>
                         </div>
 
                         <div className="overflow-auto max-h-[400px] border border-purple-200 rounded-lg">
@@ -654,80 +989,264 @@ export default function Asistencia() {
                 )}
 
                 {/* Tabla de estadísticas */}
-                {showEstadisticas && estadisticas.length > 0 && (
-                    <div className="bg-white/95 p-4 md:p-6 rounded-xl shadow-lg border border-white/40 backdrop-blur-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center">
-                                <ChartBarIcon className="h-8 w-8 text-blue-600 mr-3" />
-                                <div>
-                                    <h2 className="text-xl md:text-2xl font-bold text-blue-800">
-                                        Estadísticas de Faltas por Materia
-                                    </h2>
-                                    <p className="text-sm text-blue-600 mt-1">
-                                        {periodosAcademicos[periodoSeleccionado].nombre} ({periodosAcademicos[periodoSeleccionado].descripcion})
+                {showEstadisticas && (
+                    actualizandoEstadisticas ? (
+                        <div className="bg-white/95 p-4 md:p-6 rounded-xl shadow-lg border border-white/40 backdrop-blur-sm">
+                            <div className="flex items-center justify-center py-12">
+                                <div className="text-center">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                                    <h3 className="text-lg font-medium text-gray-900 mb-2">Actualizando estadísticas...</h3>
+                                    <p className="text-gray-500">Calculando faltas por materia</p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : estadisticas.length > 0 ? (
+                        <div className="bg-white/95 p-4 md:p-6 rounded-xl shadow-lg border border-white/40 backdrop-blur-sm">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center">
+                                    <ChartBarIcon className="h-8 w-8 text-blue-600 mr-3" />
+                                    <div>
+                                        <h2 className="text-xl md:text-2xl font-bold text-blue-800">
+                                            Estadísticas de Faltas por Materia
+                                        </h2>
+                                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                            <p className="text-sm text-blue-700">
+                                                <span className="font-semibold">📅 Período Académico:</span> {
+                                                    periodosAcademicos[periodoSeleccionado]?.nombre ||
+                                                    `Período ${periodoSeleccionado}`
+                                                }
+                                            </p>
+                                            <p className="text-sm text-blue-600 mt-1">
+                                                <span className="font-medium">📆 Fechas:</span> {
+                                                    periodosAcademicos[periodoSeleccionado]?.fechaInicio ||
+                                                    periodosFormateados[periodoSeleccionado]?.fechaInicio
+                                                } al {
+                                                    periodosAcademicos[periodoSeleccionado]?.fechaFin ||
+                                                    periodosFormateados[periodoSeleccionado]?.fechaFin
+                                                }
+                                            </p>
+                                            <p className="text-xs text-blue-500 mt-1">
+                                                {periodosAcademicos[periodoSeleccionado]?.descripcion || periodosFormateados[periodoSeleccionado]?.descripcion}
+                                            </p>
+                                        </div>
+                                        
+                                        {/* Resumen de estadísticas */}
+                                        {estadisticas.length > 0 && (
+                                            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                                    <div className="text-center">
+                                                        <div className="text-lg font-bold text-green-800">
+                                                            {estadisticas.length}
+                                                        </div>
+                                                        <div className="text-green-600">Estudiantes</div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-lg font-bold text-red-800">
+                                                            {estadisticas.reduce((sum, est) => sum + est.totalFaltas, 0)}
+                                                        </div>
+                                                        <div className="text-red-600">Faltas Totales</div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-lg font-bold text-blue-800">
+                                                            {estadisticas.reduce((sum, est) => sum + est.totalAsistencias, 0)}
+                                                        </div>
+                                                        <div className="text-blue-600">Asistencias</div>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-lg font-bold text-purple-800">
+                                                            {(() => {
+                                                                const totalFaltas = estadisticas.reduce((sum, est) => sum + est.totalFaltas, 0)
+                                                                const totalAsistencias = estadisticas.reduce((sum, est) => sum + est.totalAsistencias, 0)
+                                                                return totalAsistencias > 0 ? `${((totalFaltas / totalAsistencias) * 100).toFixed(1)}%` : '0%'
+                                                            })()}
+                                                        </div>
+                                                        <div className="text-purple-600">% Faltas</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={exportarEstadisticasExcel}
+                                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                        </svg>
+                                        Exportar Excel
+                                    </button>
+                                    <button
+                                        onClick={() => setShowEstadisticas(false)}
+                                        className="text-blue-600 hover:text-blue-800"
+                                    >
+                                        <ChevronUpIcon className="h-6 w-6" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="overflow-auto max-h-[500px] border border-blue-200 rounded-lg">
+                                <table className="w-full border-collapse">
+                                    <thead>
+                                        <tr className="bg-blue-50">
+                                            <th className="border border-blue-200 p-3 text-left text-blue-800 font-bold">Código</th>
+                                            <th className="border border-blue-200 p-3 text-left text-blue-800 font-bold">Estudiante</th>
+                                            {materias.map(materia => (
+                                                <th key={materia.codigo} className="border border-blue-200 p-3 text-center text-blue-800 font-bold">
+                                                    <div className="text-xs">{materia.nombre}</div>
+                                                    <div className="text-xs text-blue-600 mt-1">Faltas</div>
+                                                </th>
+                                            ))}
+                                            <th className="border border-blue-200 p-3 text-center text-blue-800 font-bold">
+                                                <div className="text-xs">Total</div>
+                                                <div className="text-xs text-blue-600 mt-1">Faltas</div>
+                                            </th>
+                                            <th className="border border-blue-200 p-3 text-center text-blue-800 font-bold">
+                                                <div className="text-xs">Total</div>
+                                                <div className="text-xs text-blue-600 mt-1">Registros</div>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {estadisticas.map((est, index) => {
+                                            const totalFaltas = est.totalFaltas || 0
+                                            const totalAsistencias = est.totalAsistencias || 0
+                                            const porcentajeFaltas = totalAsistencias > 0 ? Math.round((totalFaltas / totalAsistencias) * 100) : 0
+
+                                            return (
+                                                <tr key={index} className="hover:bg-blue-25">
+                                                    <td className="border border-blue-200 p-3 text-blue-700 font-medium">
+                                                        {est.codigoEstudiante}
+                                                    </td>
+                                                    <td className="border border-blue-200 p-3 text-blue-900">
+                                                        {est.estudiante}
+                                                    </td>
+                                                    {materias.map(materia => {
+                                                        const faltasMateria = est.faltasPorMateria[materia.codigo] || 0
+                                                        const asistenciasMateria = est.asistenciasPorMateria[materia.codigo] || 0
+                                                        const porcentajeMateria = asistenciasMateria > 0 ? Math.round((faltasMateria / asistenciasMateria) * 100) : 0
+
+                                                        return (
+                                                            <td key={materia.codigo} className="border border-blue-200 p-3 text-center">
+                                                                <div className="space-y-1">
+                                                                    <span className={`inline-block px-2 py-1 rounded text-sm font-bold ${faltasMateria > 0
+                                                                        ? 'bg-red-100 text-red-800'
+                                                                        : 'bg-green-100 text-green-800'
+                                                                        }`}>
+                                                                        {faltasMateria}
+                                                                    </span>
+                                                                    {asistenciasMateria > 0 && (
+                                                                        <div className="text-xs text-gray-600">
+                                                                            {porcentajeMateria}%
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        )
+                                                    })}
+                                                    <td className="border border-blue-200 p-3 text-center">
+                                                        <span className={`inline-block px-3 py-1 rounded font-bold ${totalFaltas > 5
+                                                            ? 'bg-red-200 text-red-800'
+                                                            : totalFaltas > 2
+                                                                ? 'bg-yellow-200 text-yellow-800'
+                                                                : 'bg-green-200 text-green-800'
+                                                            }`}>
+                                                            {totalFaltas}
+                                                        </span>
+                                                    </td>
+                                                    <td className="border border-blue-200 p-3 text-center">
+                                                        <div className="space-y-1">
+                                                            <span className="text-sm font-medium text-blue-800">
+                                                                {totalAsistencias}
+                                                            </span>
+                                                            {totalAsistencias > 0 && (
+                                                                <div className="text-xs text-gray-600">
+                                                                    {porcentajeFaltas}% faltas
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                        
+                                        {/* Fila de totales */}
+                                        <tr className="bg-blue-100 font-bold">
+                                            <td className="border border-blue-200 p-3 text-blue-800" colSpan="2">
+                                                TOTALES
+                                            </td>
+                                            {materias.map(materia => {
+                                                const totalMateria = estadisticas.reduce((sum, est) => 
+                                                    sum + (est.faltasPorMateria[materia.codigo] || 0), 0)
+                                                return (
+                                                    <td key={materia.codigo} className="border border-blue-200 p-3 text-center text-blue-800">
+                                                        {totalMateria}
+                                                    </td>
+                                                )
+                                            })}
+                                            <td className="border border-blue-200 p-3 text-center text-blue-800">
+                                                {estadisticas.reduce((sum, est) => sum + est.totalFaltas, 0)}
+                                            </td>
+                                            <td className="border border-blue-200 p-3 text-center text-blue-800">
+                                                {estadisticas.reduce((sum, est) => sum + est.totalAsistencias, 0)}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="bg-white/95 p-4 md:p-6 rounded-xl shadow-lg border border-white/40 backdrop-blur-sm">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center">
+                                    <ChartBarIcon className="h-8 w-8 text-blue-600 mr-3" />
+                                    <div>
+                                        <h2 className="text-xl md:text-2xl font-bold text-blue-800">
+                                            Estadísticas de Faltas por Materia
+                                        </h2>
+                                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                            <p className="text-sm text-blue-700">
+                                                <span className="font-semibold">📅 Período Académico:</span> {
+                                                    periodosAcademicos[periodoSeleccionado]?.nombre ||
+                                                    `Período ${periodoSeleccionado}`
+                                                }
+                                            </p>
+                                            <p className="text-sm text-blue-600 mt-1">
+                                                <span className="font-medium">📆 Fechas:</span> {
+                                                    periodosAcademicos[periodoSeleccionado]?.fechaInicio ||
+                                                    periodosFormateados[periodoSeleccionado]?.fechaInicio
+                                                } al {
+                                                    periodosAcademicos[periodoSeleccionado]?.fechaFin ||
+                                                    periodosFormateados[periodoSeleccionado]?.fechaFin
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowEstadisticas(false)}
+                                    className="text-blue-600 hover:text-blue-800"
+                                >
+                                    <ChevronUpIcon className="h-6 w-6" />
+                                </button>
+                            </div>
+
+                            <div className="text-center py-12">
+                                <ChartBarIcon className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                                <h3 className="text-lg font-medium text-gray-900 mb-2">No hay estadísticas disponibles</h3>
+                                <p className="text-gray-500 mb-4">
+                                    Para ver estadísticas, primero marca algunas asistencias en diferentes fechas del período seleccionado.
+                                </p>
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                                    <p className="text-sm text-blue-700">
+                                        <span className="font-semibold">💡 Consejo:</span> Las estadísticas se generan automáticamente cuando registras asistencias.
+                                        Asegúrate de marcar faltas en varias fechas para ver datos completos.
                                     </p>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => setShowEstadisticas(false)}
-                                className="text-blue-600 hover:text-blue-800"
-                            >
-                                <ChevronUpIcon className="h-6 w-6" />
-                            </button>
                         </div>
-
-                        <div className="overflow-auto max-h-[500px] border border-blue-200 rounded-lg">
-                            <table className="w-full border-collapse">
-                                <thead>
-                                    <tr className="bg-blue-50">
-                                        <th className="border border-blue-200 p-3 text-left text-blue-800 font-bold">Código</th>
-                                        <th className="border border-blue-200 p-3 text-left text-blue-800 font-bold">Estudiante</th>
-                                        {materias.map(materia => (
-                                            <th key={materia.codigo} className="border border-blue-200 p-3 text-center text-blue-800 font-bold">
-                                                {materia.nombre}
-                                            </th>
-                                        ))}
-                                        <th className="border border-blue-200 p-3 text-center text-blue-800 font-bold">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {estadisticas.map((est, index) => {
-                                        const totalFaltas = Object.values(est.faltasPorMateria).reduce((sum, faltas) => sum + faltas, 0)
-                                        return (
-                                            <tr key={index} className="hover:bg-blue-25">
-                                                <td className="border border-blue-200 p-3 text-blue-700 font-medium">
-                                                    {est.codigoEstudiante}
-                                                </td>
-                                                <td className="border border-blue-200 p-3 text-blue-900">
-                                                    {est.estudiante}
-                                                </td>
-                                                {materias.map(materia => (
-                                                    <td key={materia.codigo} className="border border-blue-200 p-3 text-center">
-                                                        <span className={`inline-block px-2 py-1 rounded text-sm font-bold ${est.faltasPorMateria[materia.codigo] > 0
-                                                            ? 'bg-red-100 text-red-800'
-                                                            : 'bg-green-100 text-green-800'
-                                                            }`}>
-                                                            {est.faltasPorMateria[materia.codigo] || 0}
-                                                        </span>
-                                                    </td>
-                                                ))}
-                                                <td className="border border-blue-200 p-3 text-center">
-                                                    <span className={`inline-block px-3 py-1 rounded font-bold ${totalFaltas > 5
-                                                        ? 'bg-red-200 text-red-800'
-                                                        : totalFaltas > 2
-                                                            ? 'bg-yellow-200 text-yellow-800'
-                                                            : 'bg-green-200 text-green-800'
-                                                        }`}>
-                                                        {totalFaltas}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    )
                 )}
 
                 {/* Modal Agregar Estudiante */}

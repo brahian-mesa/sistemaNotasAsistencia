@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { PlusIcon, PencilIcon, TrashIcon, BookOpenIcon, AcademicCapIcon, ArrowLeftIcon, UserPlusIcon, CheckCircleIcon, XCircleIcon, ClipboardDocumentListIcon, UserGroupIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, PencilIcon, TrashIcon, BookOpenIcon, AcademicCapIcon, ArrowLeftIcon, UserPlusIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import PageContainer from '../components/PageContainer'
 import * as XLSX from 'xlsx'
 import db from '../utils/database'
@@ -21,7 +21,6 @@ export default function Materias() {
     const [notasTemporales, setNotasTemporales] = useState({})
     const [tiposNotaPeriodo, setTiposNotaPeriodo] = useState({})
     const [notas, setNotas] = useState({})
-    const [notasMateria, setNotasMateria] = useState({})
     const [formData, setFormData] = useState({
         nombre: '',
         codigo: '',
@@ -39,8 +38,6 @@ export default function Materias() {
     // Estados de loading y errores
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState(null)
-    const [isLoadingNotas, setIsLoadingNotas] = useState(false)
-    const [valoresTemporales, setValoresTemporales] = useState({})
 
     // Obtener períodos académicos de la base de datos
     const [periodosAcademicos, setPeriodosAcademicos] = useState({})
@@ -112,9 +109,8 @@ export default function Materias() {
     }, [])
 
     // Cargar notas individuales desde Supabase
-    const cargarNotasIndividuales = async (materiaId = null) => {
+    const cargarNotasIndividuales = async () => {
         try {
-            setIsLoadingNotas(true);
             console.log('🔄 Cargando notas individuales desde Supabase...');
             const currentUser = auth.getCurrentUser();
 
@@ -124,19 +120,12 @@ export default function Materias() {
                 return;
             }
 
-            // Construir query base
-            let query = supabase
+            // Obtener todas las notas individuales del usuario
+            const { data: notasDB, error } = await supabase
                 .from('notas_individuales')
                 .select('*')
-                .eq('usuario_id', currentUser.id);
-
-            // Si se especifica una materia, filtrar por ella
-            if (materiaId) {
-                query = query.eq('materia_id', materiaId);
-                console.log(`🔍 Cargando notas específicas para materia ID: ${materiaId}`);
-            }
-
-            const { data: notasDB, error } = await query.order('created_at', { ascending: false });
+                .eq('usuario_id', currentUser.id)
+                .order('created_at', { ascending: false });
 
             if (error) {
                 console.error('❌ Error obteniendo notas individuales:', error);
@@ -148,19 +137,11 @@ export default function Materias() {
 
             // Convertir a formato del estado local
             const notasFormateadas = {};
-            const tiposNotaEncontrados = new Set(); // Para rastrear tipos de nota únicos
 
             notasDB.forEach(nota => {
                 const materiaId = nota.materia_id;
                 const estudianteId = nota.estudiante_id;
                 const periodoKey = `periodo${nota.periodo}`;
-
-                // Agregar tipo de nota a la lista de tipos encontrados
-                tiposNotaEncontrados.add({
-                    id: nota.tipo_nota_id,
-                    titulo: nota.titulo,
-                    periodo: nota.periodo
-                });
 
                 if (!notasFormateadas[materiaId]) {
                     notasFormateadas[materiaId] = {};
@@ -191,30 +172,6 @@ export default function Materias() {
                 return notasActualizadas;
             });
 
-            // Actualizar tipos de nota basado en las notas encontradas
-            if (materiaId && tiposNotaEncontrados.size > 0) {
-                const tiposNotaParaMateria = {};
-                tiposNotaEncontrados.forEach(tipo => {
-                    if (!tiposNotaParaMateria[tipo.periodo]) {
-                        tiposNotaParaMateria[tipo.periodo] = [];
-                    }
-                    // Evitar duplicados
-                    if (!tiposNotaParaMateria[tipo.periodo].find(t => t.id === tipo.id)) {
-                        tiposNotaParaMateria[tipo.periodo].push({
-                            id: tipo.id,
-                            titulo: tipo.titulo
-                        });
-                    }
-                });
-
-                setTiposNotaPeriodo(prev => ({
-                    ...prev,
-                    [materiaId]: tiposNotaParaMateria
-                }));
-
-                console.log('📝 Tipos de nota actualizados desde BD:', tiposNotaParaMateria);
-            }
-
             // Mostrar confirmación de carga exitosa
             const totalNotas = Object.values(notasFormateadas).reduce((acc, materia) => {
                 return acc + Object.values(materia).reduce((acc2, estudiante) => {
@@ -222,146 +179,12 @@ export default function Materias() {
                 }, 0);
             }, 0);
 
-            const mensaje = materiaId 
-                ? `✅ ${totalNotas} notas cargadas para esta materia desde BD`
-                : `✅ ${totalNotas} notas cargadas desde BD`;
-            mostrarEstadoGuardado(mensaje);
+            mostrarEstadoGuardado(`✅ ${totalNotas} notas cargadas desde BD`);
 
         } catch (error) {
             console.error('❌ Error cargando notas individuales:', error);
             mostrarEstadoGuardado('❌ Error cargando notas');
-        } finally {
-            setIsLoadingNotas(false);
         }
-    }
-
-    // Cargar notas desde base de datos para el resumen
-    const cargarNotasDesdeBD = async () => {
-        try {
-            console.log('🔄 Cargando notas desde base de datos...');
-            const currentUser = auth.getCurrentUser();
-
-            if (!currentUser?.id) {
-                console.error('❌ No hay usuario autenticado');
-                alert('No hay usuario autenticado');
-                return;
-            }
-
-            if (!selectedMateria) {
-                alert('Selecciona una materia primero');
-                return;
-            }
-
-            console.log('👤 Usuario:', currentUser.nombre, 'ID:', currentUser.id);
-            console.log('📚 Materia seleccionada:', selectedMateria.nombre, 'ID:', selectedMateria.id);
-
-            // Cargar notas individuales desde Supabase
-            const notasIndividuales = await cargarNotasIndividualesDesdeBD(selectedMateria.id);
-            console.log('📝 Notas individuales cargadas desde BD:', notasIndividuales);
-
-            if (!notasIndividuales || Object.keys(notasIndividuales).length === 0) {
-                console.log('⚠️ No hay notas individuales en la base de datos');
-                return;
-            }
-
-            // Actualizar el estado con las notas individuales
-            setNotas(prev => ({
-                ...prev,
-                [selectedMateria.id]: notasIndividuales
-            }));
-            console.log('✅ Notas individuales cargadas desde BD:', notasIndividuales);
-            
-            // Mostrar estructura de datos para debug
-            console.log('📋 Estructura de notas cargadas:');
-            Object.keys(notasIndividuales).forEach(estudianteId => {
-                console.log(`👤 Estudiante ${estudianteId}:`, notasIndividuales[estudianteId]);
-                Object.keys(notasIndividuales[estudianteId]).forEach(periodo => {
-                    console.log(`📅 ${periodo}:`, notasIndividuales[estudianteId][periodo]);
-                });
-            });
-
-            // Contar el total de notas cargadas
-            let totalNotas = 0;
-            Object.values(notasIndividuales).forEach(estudianteNotas => {
-                Object.values(estudianteNotas).forEach(periodoNotas => {
-                    if (Array.isArray(periodoNotas)) {
-                        totalNotas += periodoNotas.length;
-                    }
-                });
-            });
-
-            // Mostrar mensaje de éxito
-            const mensaje = `✅ ${totalNotas} notas cargadas desde BD para ${selectedMateria.nombre}`;
-            mostrarEstadoGuardado(mensaje);
-
-        } catch (error) {
-            console.error('❌ Error cargando notas desde BD:', error);
-            alert(`Error cargando notas: ${error.message}`);
-            setAutoSaveStatus('❌ Error cargando notas desde BD');
-            setTimeout(() => setAutoSaveStatus(''), 3000);
-        }
-    }
-
-    // Función para agregar notas de prueba
-    const agregarNotasPrueba = () => {
-        if (!selectedMateria) {
-            alert('Selecciona una materia primero');
-            return;
-        }
-
-        if (estudiantes.length === 0) {
-            alert('No hay estudiantes registrados');
-            return;
-        }
-
-        // Crear algunas notas de prueba
-        const nuevasNotas = { ...notasMateria };
-        
-        estudiantes.slice(0, 3).forEach((estudiante, index) => {
-            const estudianteId = estudiante.id;
-            const periodoKey = `periodo${selectedPeriodo}`;
-            
-            if (!nuevasNotas[estudianteId]) {
-                nuevasNotas[estudianteId] = {};
-            }
-            if (!nuevasNotas[estudianteId][periodoKey]) {
-                nuevasNotas[estudianteId][periodoKey] = [];
-            }
-            
-            // Agregar notas de prueba
-            const notasPrueba = [
-                { id: `prueba-${estudianteId}-1`, tipoNotaId: 'quiz', titulo: 'Quiz', valor: 3.5 + index * 0.5 },
-                { id: `prueba-${estudianteId}-2`, tipoNotaId: 'tarea', titulo: 'Tarea', valor: 4.0 + index * 0.2 },
-                { id: `prueba-${estudianteId}-3`, tipoNotaId: 'examen', titulo: 'Examen', valor: 3.8 + index * 0.3 }
-            ];
-            
-            nuevasNotas[estudianteId][periodoKey] = notasPrueba;
-        });
-        
-        // También agregar tipos de nota de prueba
-        const nuevosTiposNota = { ...tiposNotaPeriodo };
-        if (!nuevosTiposNota[selectedMateria.id]) {
-            nuevosTiposNota[selectedMateria.id] = {};
-        }
-        if (!nuevosTiposNota[selectedMateria.id][selectedPeriodo]) {
-            nuevosTiposNota[selectedMateria.id][selectedPeriodo] = [];
-        }
-        
-        const tiposPrueba = [
-            { id: 'quiz', titulo: 'Quiz', descripcion: 'Evaluación rápida' },
-            { id: 'tarea', titulo: 'Tarea', descripcion: 'Trabajo en casa' },
-            { id: 'examen', titulo: 'Examen', descripcion: 'Evaluación formal' }
-        ];
-        
-        nuevosTiposNota[selectedMateria.id][selectedPeriodo] = tiposPrueba;
-        setTiposNotaPeriodo(nuevosTiposNota);
-        
-        setNotasMateria(nuevasNotas);
-        console.log('✅ Notas de prueba agregadas:', nuevasNotas);
-        console.log('✅ Tipos de nota agregados:', nuevosTiposNota);
-        
-        setAutoSaveStatus('✅ Notas y tipos de prueba agregados');
-        setTimeout(() => setAutoSaveStatus(''), 3000);
     }
 
     const cargarPeriodosAcademicos = async () => {
@@ -636,7 +459,7 @@ export default function Materias() {
         setSelectedMateria(materia)
 
         // Cargar notas individuales específicas para esta materia
-        await cargarNotasIndividuales(materia.id)
+        await cargarNotasIndividuales()
 
         // Inicializar notas para esta materia si no existen
         if (!notas[materia.id]) {
@@ -783,228 +606,139 @@ export default function Materias() {
     }
 
     const agregarNotaIndividual = async (estudianteId, tipoNotaId, valor) => {
-        console.log('🎯 Procesando nota:', { estudianteId, tipoNotaId, valor, materia: selectedMateria?.id, periodo: selectedPeriodo });
-        
-        try {
-            // Validaciones básicas
-            if (!selectedMateria?.id || !estudianteId || !tipoNotaId) {
-                mostrarEstadoGuardado('❌ Error: Datos incompletos');
-                return;
-            }
-            
-            // Si el valor está vacío, borrar la nota
-            if (valor === '' || valor === null || valor === undefined) {
-                console.log('🗑️ Valor vacío - eliminando nota');
-                await borrarNotaIndividual(estudianteId, tipoNotaId);
-                return;
-            }
-
-            // Limpiar y validar el valor
-            const valorLimpio = valor.toString().replace(',', '.');
-            const nota = parseFloat(valorLimpio);
-            
-            if (isNaN(nota) || nota < 1.0 || nota > 5.0) {
-                mostrarEstadoGuardado('❌ Nota inválida. Debe estar entre 1.0 y 5.0');
-                return;
-            }
-
-            // Buscar el tipo de nota
-            const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || [];
-            const tiposExistentes = obtenerTiposNotaExistentes();
-            const tipoNota = [...tiposManuales, ...tiposExistentes].find(t => t.id === tipoNotaId);
-            
-            if (!tipoNota) {
-                mostrarEstadoGuardado('❌ Error: Tipo de nota no encontrado');
-                return;
-            }
-
-            // Verificar si ya existe la nota para determinar si es actualización o creación
-            const periodoKey = `periodo${selectedPeriodo}`;
-            const notaExistente = notas[selectedMateria.id]?.[estudianteId]?.[periodoKey]?.find(n => n.tipoId === tipoNotaId);
-            const esActualizacion = !!notaExistente;
-
-            console.log(`🔄 ${esActualizacion ? 'Actualizando' : 'Creando'} nota:`, { 
-                tipo: tipoNota.titulo, 
-                valor: nota, 
-                existente: esActualizacion 
-            });
-
-            // Guardar/actualizar en la base de datos usando UPSERT
-            const safeTipoNotaId = parseInt(tipoNotaId);
-            const resultado = await db.guardarNotaIndividual(
-                selectedMateria.id,
-                estudianteId,
-                selectedPeriodo,
-                safeTipoNotaId,
-                tipoNota.titulo,
-                nota
-            );
-
-            console.log('📊 Resultado del guardado:', resultado);
-
-            // Actualizar estado local después del guardado exitoso
-            setNotas(prev => {
-                const nuevasNotas = { ...prev };
-                
-                if (!nuevasNotas[selectedMateria.id]) nuevasNotas[selectedMateria.id] = {};
-                if (!nuevasNotas[selectedMateria.id][estudianteId]) nuevasNotas[selectedMateria.id][estudianteId] = {};
-                if (!nuevasNotas[selectedMateria.id][estudianteId][periodoKey]) nuevasNotas[selectedMateria.id][estudianteId][periodoKey] = [];
-
-                // Buscar si ya existe la nota en el estado local
-                const notaExistenteLocal = nuevasNotas[selectedMateria.id][estudianteId][periodoKey].find(n => n.tipoId === tipoNotaId);
-                
-                if (notaExistenteLocal) {
-                    // Actualizar nota existente
-                    notaExistenteLocal.valor = nota;
-                    notaExistenteLocal.updated_at = new Date().toISOString();
-                    console.log('📝 Nota actualizada en estado local:', notaExistenteLocal);
-                } else {
-                    // Crear nueva nota
-                    const nuevaNota = {
-                        id: resultado?.id || Math.floor(Math.random() * 10000) + estudianteId,
-                        tipoId: tipoNotaId,
-                        titulo: tipoNota.titulo,
-                        valor: nota,
-                        fecha: new Date().toISOString().split('T')[0],
-                        created_at: new Date().toISOString()
-                    };
-                    nuevasNotas[selectedMateria.id][estudianteId][periodoKey].push(nuevaNota);
-                    console.log('📝 Nueva nota creada en estado local:', nuevaNota);
-                }
-                
-                return nuevasNotas;
-            });
-
-            // Mostrar mensaje de éxito específico
-            const mensaje = esActualizacion 
-                ? `✅ ${tipoNota.titulo} = ${nota} actualizado`
-                : `✅ ${tipoNota.titulo} = ${nota} creado`;
-            
-            mostrarEstadoGuardado(mensaje);
-            console.log(`✅ Operación completada: ${mensaje}`);
-            
-        } catch (error) {
-            console.error('❌ Error procesando nota:', error);
-            mostrarEstadoGuardado(`❌ Error al procesar: ${error.message}`);
+        // Si el valor está vacío, borrar la nota
+        if (valor === '' || valor === null || valor === undefined) {
+            borrarNotaIndividual(estudianteId, tipoNotaId)
+            return
         }
-    }
 
-    const borrarNotaIndividual = async (estudianteId, tipoNotaId) => {
-        console.log('🗑️ Eliminando nota:', { estudianteId, tipoNotaId, materia: selectedMateria?.id, periodo: selectedPeriodo });
-        
-        try {
-            // Validaciones básicas
-            if (!selectedMateria?.id || !estudianteId || !tipoNotaId) {
-                mostrarEstadoGuardado('❌ Error: Datos incompletos para eliminar');
-                return;
-            }
+        // Validar que el valor esté entre 1 y 5
+        const nota = parseFloat(valor)
+        if (isNaN(nota) || nota <= 0 || nota > 5) {
+            mostrarEstadoGuardado('La nota debe estar entre 1.0 y 5.0')
+            return
+        }
 
-            // Buscar el tipo de nota
-            const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || [];
-            const tiposExistentes = obtenerTiposNotaExistentes();
-            const tipoNota = [...tiposManuales, ...tiposExistentes].find(t => t.id === tipoNotaId);
-            
-            if (!tipoNota) {
-                console.log('⚠️ Tipo de nota no encontrado para eliminar');
-                mostrarEstadoGuardado('⚠️ Tipo de nota no encontrado');
-                return;
-            }
+        const periodoKey = `periodo${selectedPeriodo}`
+        const tipoNota = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo]?.find(t => t.id === tipoNotaId)
+        if (!tipoNota) return
 
-            const periodoKey = `periodo${selectedPeriodo}`;
-            const notaExistente = notas[selectedMateria.id]?.[estudianteId]?.[periodoKey]?.find(n => n.tipoId === tipoNotaId);
-            
-            console.log('🔍 Nota a eliminar:', { 
-                tipo: tipoNota.titulo, 
-                existe: !!notaExistente, 
-                id: notaExistente?.id 
-            });
+        // Actualizar estado local primero para respuesta inmediata
+        setNotas(prev => {
+            const nuevasNotas = { ...prev }
 
-            // Eliminar de la base de datos
-            if (notaExistente && notaExistente.id) {
-                console.log('🔄 Eliminando nota existente por ID:', notaExistente.id);
-                await db.eliminarNotaIndividualPorId(notaExistente.id);
+            if (!nuevasNotas[selectedMateria.id]) nuevasNotas[selectedMateria.id] = {}
+            if (!nuevasNotas[selectedMateria.id][estudianteId]) nuevasNotas[selectedMateria.id][estudianteId] = {}
+            if (!nuevasNotas[selectedMateria.id][estudianteId][periodoKey]) nuevasNotas[selectedMateria.id][estudianteId][periodoKey] = []
+
+            // Verificar si ya existe una nota de este tipo
+            const notaExistente = nuevasNotas[selectedMateria.id][estudianteId][periodoKey].find(n => n.tipoId === tipoNotaId)
+
+            if (notaExistente) {
+                // Actualizar nota existente
+                notaExistente.valor = nota
+                notaExistente.updated_at = new Date().toISOString()
+                console.log('📝 Nota actualizada en estado local:', notaExistente);
             } else {
-                console.log('🔄 Eliminando nota por parámetros (no se encontró ID)');
-                await db.eliminarNotaIndividual(
+                // Agregar nueva nota
+                const nuevaNota = {
+                    id: Math.floor(Math.random() * 10000) + estudianteId, // ID más pequeño
+                    tipoId: tipoNotaId,
+                    titulo: tipoNota.titulo,
+                    valor: nota,
+                    fecha: new Date().toISOString().split('T')[0],
+                    created_at: new Date().toISOString()
+                }
+                nuevasNotas[selectedMateria.id][estudianteId][periodoKey].push(nuevaNota)
+                console.log('📝 Nueva nota agregada al estado local:', nuevaNota);
+            }
+
+            console.log('📊 Estado de notas actualizado:', nuevasNotas[selectedMateria.id]);
+            return nuevasNotas
+        })
+
+        // Guardar en la base de datos en segundo plano (sin bloquear la UI)
+        setTimeout(async () => {
+            try {
+                // Validar que tipoNotaId sea un número válido
+                const safeTipoNotaId = parseInt(tipoNotaId)
+                if (isNaN(safeTipoNotaId) || safeTipoNotaId > 1000) {
+                    console.error('❌ TipoNotaId inválido:', tipoNotaId)
+                    return
+                }
+
+                await db.guardarNotaIndividual(
                     selectedMateria.id,
                     estudianteId,
                     selectedPeriodo,
-                    tipoNotaId
-                );
+                    safeTipoNotaId,
+                    tipoNota.titulo,
+                    nota
+                )
+                console.log(`✅ Nota guardada en Supabase: ${tipoNota.titulo} = ${nota}`)
+
+                // Mostrar confirmación visual inmediata
+                mostrarEstadoGuardado(`✅ ${tipoNota.titulo} = ${nota} guardado`)
+            } catch (error) {
+                console.error('❌ Error guardando nota en BD:', error)
+                mostrarEstadoGuardado('❌ Error al guardar nota')
+            }
+        }, 100)
+
+        // Mostrar confirmación visual inmediata
+        mostrarEstadoGuardado(`Guardado: ${tipoNota.titulo} = ${nota}`)
+    }
+
+    const borrarNotaIndividual = async (estudianteId, tipoNotaId) => {
+        const periodoKey = `periodo${selectedPeriodo}`
+        const tipoNota = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo]?.find(t => t.id === tipoNotaId)
+        if (!tipoNota) return
+
+        // Eliminar de la base de datos usando el método correcto
+        try {
+            await db.eliminarNotaIndividual(
+                selectedMateria.id,
+                estudianteId,
+                selectedPeriodo,
+                tipoNotaId
+            )
+        } catch (error) {
+            console.error('Error eliminando nota de BD:', error)
+        }
+
+        setNotas(prev => {
+            const nuevasNotas = { ...prev }
+
+            if (nuevasNotas[selectedMateria.id] &&
+                nuevasNotas[selectedMateria.id][estudianteId] &&
+                nuevasNotas[selectedMateria.id][estudianteId][periodoKey]) {
+
+                // Filtrar la nota específica
+                nuevasNotas[selectedMateria.id][estudianteId][periodoKey] =
+                    nuevasNotas[selectedMateria.id][estudianteId][periodoKey].filter(n => n.tipoId !== tipoNotaId)
             }
 
-            console.log('✅ Nota eliminada de la base de datos');
+            return nuevasNotas
+        })
 
-            // Actualizar estado local
-            setNotas(prev => {
-                const nuevasNotas = { ...prev };
-
-                if (nuevasNotas[selectedMateria.id]?.[estudianteId]?.[periodoKey]) {
-                    const notasAntes = nuevasNotas[selectedMateria.id][estudianteId][periodoKey].length;
-                    // Filtrar la nota específica
-                    nuevasNotas[selectedMateria.id][estudianteId][periodoKey] = 
-                        nuevasNotas[selectedMateria.id][estudianteId][periodoKey].filter(n => n.tipoId !== tipoNotaId);
-                    const notasDespues = nuevasNotas[selectedMateria.id][estudianteId][periodoKey].length;
-                    
-                    console.log(`📊 Estado local actualizado: ${notasAntes} → ${notasDespues} notas`);
-                } else {
-                    console.log('📊 No había notas para este estudiante/período');
-                }
-
-                return nuevasNotas;
-            });
-
-            // Mostrar confirmación
-            mostrarEstadoGuardado(`✅ Eliminado: ${tipoNota.titulo}`);
-            console.log(`✅ Nota eliminada exitosamente: ${tipoNota.titulo}`);
-            
-        } catch (error) {
-            console.error('❌ Error eliminando nota:', error);
-            mostrarEstadoGuardado(`❌ Error al eliminar: ${error.message}`);
-        }
+        // Mostrar confirmación visual
+        console.log(`Nota eliminada: ${tipoNota.titulo}`)
+        mostrarEstadoGuardado(`Eliminado: ${tipoNota.titulo}`)
     }
 
     const obtenerNotaPorTipo = (estudianteId, tipoNotaId) => {
-        if (!selectedMateria || !notas[selectedMateria.id] || !notas[selectedMateria.id][estudianteId]) {
-            return ''
-        }
-
         const periodoKey = `periodo${selectedPeriodo}`
-        const notasPeriodo = notas[selectedMateria.id][estudianteId][periodoKey] || []
+        const notasPeriodo = notas[selectedMateria.id]?.[estudianteId]?.[periodoKey] || []
         const nota = notasPeriodo.find(n => n.tipoId === tipoNotaId)
 
-        // Debug: mostrar información detallada
-        console.log(`🔍 Buscando nota para estudiante ${estudianteId}, tipo ${tipoNotaId}:`)
-        console.log(`📊 Notas del período ${periodoKey}:`, notasPeriodo)
-        console.log(`🎯 Nota encontrada:`, nota)
-        console.log(`📝 Estado notas:`, notas[selectedMateria.id])
-
-        return nota ? nota.valor : ''
-    }
-
-    // Función para obtener todos los tipos de nota únicos de las notas existentes
-    const obtenerTiposNotaExistentes = () => {
-        if (!selectedMateria || !notas[selectedMateria.id]) {
-            return []
+        // Debug: mostrar información de la nota (solo en desarrollo)
+        if (process.env.NODE_ENV === 'development') {
+            if (nota) {
+                console.log(`🔍 Nota encontrada para estudiante ${estudianteId}, tipo ${tipoNotaId}:`, nota.valor)
+            }
         }
 
-        const tiposNotaUnicos = new Map()
-        const periodoKey = `periodo${selectedPeriodo}`
-
-        // Recorrer todas las notas de la materia para el período actual
-        Object.values(notas[selectedMateria.id]).forEach(estudianteNotas => {
-            const notasPeriodo = estudianteNotas[periodoKey] || []
-            notasPeriodo.forEach(nota => {
-                if (!tiposNotaUnicos.has(nota.tipoId)) {
-                    tiposNotaUnicos.set(nota.tipoId, {
-                        id: nota.tipoId,
-                        titulo: nota.titulo
-                    })
-                }
-            })
-        })
-
-        return Array.from(tiposNotaUnicos.values())
+        return nota ? nota.valor : ''
     }
 
     const copiarDatos = async () => {
@@ -1019,92 +753,36 @@ export default function Materias() {
     }
 
     const eliminarTipoNota = async (tipoNotaId) => {
-        console.log('🗑️ Eliminando tipo de nota:', { tipoNotaId, materia: selectedMateria?.id, periodo: selectedPeriodo });
-        
-        try {
-            // Buscar el tipo de nota para obtener su información
-            const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || [];
-            const tiposExistentes = obtenerTiposNotaExistentes();
-            const tipoNota = [...tiposManuales, ...tiposExistentes].find(t => t.id === tipoNotaId);
-            
-            if (!tipoNota) {
-                mostrarEstadoGuardado('❌ Error: Tipo de nota no encontrado');
-                return;
+        // Eliminar el tipo de nota solo de la materia actual
+        setTiposNotaPeriodo(prev => ({
+            ...prev,
+            [selectedMateria.id]: {
+                ...prev[selectedMateria.id],
+                [selectedPeriodo]: prev[selectedMateria.id]?.[selectedPeriodo]?.filter(t => t.id !== tipoNotaId) || []
             }
+        }))
 
-            // Confirmar eliminación
-            const confirmar = confirm(`¿Estás seguro de que quieres eliminar la columna "${tipoNota.titulo}"?\n\nEsto eliminará TODAS las notas de este tipo para todos los estudiantes en el período ${selectedPeriodo}.`);
-            
-            if (!confirmar) {
-                console.log('❌ Eliminación cancelada por el usuario');
-                return;
+        // También eliminar las notas asociadas SOLO de la materia actual
+        setNotas(prev => {
+            const nuevasNotas = { ...prev }
+            if (nuevasNotas[selectedMateria.id]) {
+                Object.keys(nuevasNotas[selectedMateria.id]).forEach(estudianteId => {
+                    const periodoKey = `periodo${selectedPeriodo}`
+                    if (nuevasNotas[selectedMateria.id][estudianteId]?.[periodoKey]) {
+                        nuevasNotas[selectedMateria.id][estudianteId][periodoKey] =
+                            nuevasNotas[selectedMateria.id][estudianteId][periodoKey].filter(n => n.tipoId !== tipoNotaId)
+                    }
+                })
             }
-
-            console.log('🔄 Eliminando tipo de nota y todas sus notas relacionadas...');
-
-            // 1. Eliminar todas las notas relacionadas con este tipo de la base de datos
-            const estudiantes = Object.keys(notas[selectedMateria.id] || {});
-            let notasEliminadas = 0;
-
-            for (const estudianteId of estudiantes) {
-                try {
-                    await db.eliminarNotaIndividual(
-                        selectedMateria.id,
-                        estudianteId,
-                        selectedPeriodo,
-                        tipoNotaId
-                    );
-                    notasEliminadas++;
-                } catch (error) {
-                    console.error(`Error eliminando nota para estudiante ${estudianteId}:`, error);
-                }
-            }
-
-            console.log(`✅ ${notasEliminadas} notas eliminadas de la base de datos`);
-
-            // 2. Eliminar el tipo de nota del estado local
-            setTiposNotaPeriodo(prev => ({
-                ...prev,
-                [selectedMateria.id]: {
-                    ...prev[selectedMateria.id],
-                    [selectedPeriodo]: prev[selectedMateria.id]?.[selectedPeriodo]?.filter(t => t.id !== tipoNotaId) || []
-                }
-            }));
-
-            // 3. Eliminar todas las notas asociadas del estado local
-            setNotas(prev => {
-                const nuevasNotas = { ...prev };
-                if (nuevasNotas[selectedMateria.id]) {
-                    Object.keys(nuevasNotas[selectedMateria.id]).forEach(estudianteId => {
-                        const periodoKey = `periodo${selectedPeriodo}`;
-                        if (nuevasNotas[selectedMateria.id][estudianteId]?.[periodoKey]) {
-                            nuevasNotas[selectedMateria.id][estudianteId][periodoKey] =
-                                nuevasNotas[selectedMateria.id][estudianteId][periodoKey].filter(n => n.tipoId !== tipoNotaId);
-                        }
-                    });
-                }
-                return nuevasNotas;
-            });
-
-            // 4. Mostrar confirmación
-            mostrarEstadoGuardado(`✅ Columna "${tipoNota.titulo}" eliminada (${notasEliminadas} notas)`);
-            console.log(`✅ Tipo de nota eliminado: ${tipoNota.titulo}`);
-            
-        } catch (error) {
-            console.error('❌ Error eliminando tipo de nota:', error);
-            mostrarEstadoGuardado(`❌ Error al eliminar columna: ${error.message}`);
-        }
+            return nuevasNotas
+        })
     }
 
     const calcularPromedioPeriodo = (estudianteId, periodo) => {
-        if (!selectedMateria || !notas[selectedMateria.id] || !notas[selectedMateria.id][estudianteId]) {
-            return 0
-        }
-
         const periodoKey = `periodo${periodo}`
-        const notasPeriodo = notas[selectedMateria.id][estudianteId][periodoKey] || []
+        const notasPeriodo = notas[selectedMateria.id]?.[estudianteId]?.[periodoKey] || []
         if (notasPeriodo.length === 0) return 0
-        const suma = notasPeriodo.reduce((acc, nota) => acc + parseFloat(nota.valor), 0)
+        const suma = notasPeriodo.reduce((acc, nota) => acc + nota.valor, 0)
         return Math.round((suma / notasPeriodo.length) * 100) / 100
     }
 
@@ -1115,10 +793,9 @@ export default function Materias() {
     }
 
     const getEstadoNota = (promedio) => {
-        const prom = parseFloat(promedio)
-        if (prom >= 3.5) return 'bg-green-100 text-green-800'
-        if (prom >= 3.0) return 'bg-yellow-100 text-yellow-800'
-        return 'bg-red-100 text-red-800'
+        if (promedio >= 3.5) return 'text-green-600 font-bold'
+        if (promedio >= 3.0) return 'text-yellow-600 font-bold'
+        return 'text-red-600 font-bold'
     }
 
     const guardarNotas = async () => {
@@ -1329,14 +1006,7 @@ export default function Materias() {
                                 <label className="text-sm font-medium text-gray-700">Período:</label>
                                 <select
                                     value={selectedPeriodo}
-                                    onChange={async (e) => {
-                                        const nuevoPeriodo = parseInt(e.target.value);
-                                        setSelectedPeriodo(nuevoPeriodo);
-                                        // Recargar notas para el nuevo período
-                                        if (selectedMateria) {
-                                            await cargarNotasIndividuales(selectedMateria.id);
-                                        }
-                                    }}
+                                    onChange={(e) => setSelectedPeriodo(parseInt(e.target.value))}
                                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                                 >
                                     <option value={1}>Período 1</option>
@@ -1348,18 +1018,8 @@ export default function Materias() {
                             <div className="flex flex-wrap gap-2">
                                 {/* Indicador de auto-guardado */}
                                 {autoSaveStatus && (
-                                    <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${
-                                        autoSaveStatus.includes('✅') 
-                                            ? 'bg-green-100 text-green-800 border-green-200' 
-                                            : autoSaveStatus.includes('❌') 
-                                                ? 'bg-red-100 text-red-800 border-red-200' 
-                                                : 'bg-blue-100 text-blue-800 border-blue-200'
-                                    }`}>
-                                        <div className="flex items-center gap-2">
-                                            {autoSaveStatus.includes('✅') && <span>✅</span>}
-                                            {autoSaveStatus.includes('❌') && <span>❌</span>}
-                                            <span>{autoSaveStatus}</span>
-                                        </div>
+                                    <div className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm font-medium border border-green-200 animate-pulse">
+                                        {autoSaveStatus}
                                     </div>
                                 )}
 
@@ -1448,105 +1108,35 @@ export default function Materias() {
 
                     {/* Tabla de notas */}
                     <div className="p-4 md:p-6">
-                        {/* Botones para cargar notas */}
-                        <div className="mb-4 flex justify-end gap-2">
-                            <button
-                                onClick={agregarNotasPrueba}
-                                className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2 text-sm font-medium"
-                            >
-                                <PlusIcon className="w-4 h-4" />
-                                Agregar Notas Prueba
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    if (selectedMateria) {
-                                        await cargarNotasIndividuales(selectedMateria.id);
-                                    } else {
-                                        await cargarNotasIndividuales();
-                                    }
-                                }}
-                                className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2 text-sm font-medium"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                Recargar Notas desde BD
-                            </button>
-                        </div>
-
-                        {/* Tabla de notas - Siempre visible */}
-                        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                            {isLoadingNotas && (
-                                <div className="bg-blue-50 border-b border-blue-200 p-3">
-                                    <div className="flex items-center justify-center">
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                                        <span className="text-blue-700 text-sm font-medium">Cargando notas desde la base de datos...</span>
-                                    </div>
+                        {(tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []).length === 0 ? (
+                            <div className="bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+                                <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400" />
+                                <h3 className="mt-2 text-lg font-medium text-gray-900">No hay tipos de nota creados</h3>
+                                <p className="mt-1 text-gray-500">Comienza agregando una columna de nota para el Período {selectedPeriodo}</p>
+                                <div className="mt-6">
+                                    <button
+                                        onClick={() => setShowAddTipoNotaModal(true)}
+                                        className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 mx-auto"
+                                    >
+                                        <PlusIcon className="w-4 h-4" />
+                                        Agregar Primera Columna
+                                    </button>
                                 </div>
-                            )}
-                            
-                            {/* Mensaje cuando no hay columnas de notas */}
-                            {(() => {
-                                const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
-                                const tiposExistentes = obtenerTiposNotaExistentes()
-                                const tieneNotas = tiposManuales.length > 0 || tiposExistentes.length > 0
-                                
-                                if (!tieneNotas) {
-                                    return (
-                                        <div className="bg-yellow-50 border-b border-yellow-200 p-3">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center">
-                                                    <BookOpenIcon className="h-5 w-5 text-yellow-600 mr-2" />
-                                                    <span className="text-yellow-700 text-sm font-medium">
-                                                        No hay notas para el Período {selectedPeriodo}. Agrega la primera columna de notas.
-                                                    </span>
-                                                </div>
-                                                <button
-                                                    onClick={() => setShowAddTipoNotaModal(true)}
-                                                    className="bg-purple-600 text-white px-3 py-1 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-1 text-sm"
-                                                >
-                                                    <PlusIcon className="w-4 h-4" />
-                                                    Agregar Columna
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )
-                                }
-                                return null
-                            })()}
-                            
-                            <div className="overflow-auto max-h-[600px]">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Estudiante
-                                            </th>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Código
-                                            </th>
-                                            {/* Columnas dinámicas para cada tipo de nota */}
-                                            {(() => {
-                                                // Combinar tipos de nota creados manualmente con tipos de nota existentes en las notas
-                                                const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
-                                                const tiposExistentes = obtenerTiposNotaExistentes()
-                                                
-                                                // Crear un mapa para evitar duplicados
-                                                const tiposCombinados = new Map()
-                                                
-                                                // Agregar tipos manuales primero
-                                                tiposManuales.forEach(tipo => {
-                                                    tiposCombinados.set(tipo.id, tipo)
-                                                })
-                                                
-                                                // Agregar tipos existentes que no estén en los manuales
-                                                tiposExistentes.forEach(tipo => {
-                                                    if (!tiposCombinados.has(tipo.id)) {
-                                                        tiposCombinados.set(tipo.id, tipo)
-                                                    }
-                                                })
-                                                
-                                                return Array.from(tiposCombinados.values()).map((tipo) => (
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                <div className="overflow-auto max-h-[600px]">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Estudiante
+                                                </th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Código
+                                                </th>
+                                                {/* Columnas dinámicas para cada tipo de nota */}
+                                                {(tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []).map((tipo) => (
                                                     <th key={tipo.id} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                         <div className="flex items-center justify-center gap-1">
                                                             <span>{tipo.titulo}</span>
@@ -1559,292 +1149,145 @@ export default function Materias() {
                                                             </button>
                                                         </div>
                                                     </th>
-                                                ))
-                                            })()}
-                                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Promedio
-                                            </th>
-                                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                Estado
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {estudiantes.map((estudiante) => {
-                                            const promedioPeriodo = calcularPromedioPeriodo(estudiante.id, selectedPeriodo)
-                                            const estadoPeriodo = getEstadoNota(promedioPeriodo.toFixed(1))
+                                                ))}
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Promedio
+                                                </th>
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                    Estado
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200">
+                                            {estudiantes.map((estudiante) => {
+                                                const promedioPeriodo = calcularPromedioPeriodo(estudiante.id, selectedPeriodo)
+                                                const estadoPeriodo = getEstadoNota(promedioPeriodo.toFixed(1))
 
-                                            return (
-                                                <tr key={estudiante.id} className="hover:bg-gray-50">
-                                                    <td className="px-4 py-4 whitespace-nowrap">
-                                                        <div className="text-sm font-medium text-gray-900">{estudiante.nombre}</div>
-                                                    </td>
-                                                    <td className="px-4 py-4 whitespace-nowrap">
-                                                        <div className="text-sm text-gray-500">{estudiante.codigo}</div>
-                                                    </td>
-                                                    {/* Celdas para cada tipo de nota */}
-                                                    {(() => {
-                                                        // Usar la misma lógica para obtener tipos combinados
-                                                        const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
-                                                        const tiposExistentes = obtenerTiposNotaExistentes()
-                                                        
-                                                        const tiposCombinados = new Map()
-                                                        tiposManuales.forEach(tipo => tiposCombinados.set(tipo.id, tipo))
-                                                        tiposExistentes.forEach(tipo => {
-                                                            if (!tiposCombinados.has(tipo.id)) {
-                                                                tiposCombinados.set(tipo.id, tipo)
-                                                            }
-                                                        })
-                                                        
-                                                        return Array.from(tiposCombinados.values()).map((tipo) => {
+                                                return (
+                                                    <tr key={estudiante.id} className="hover:bg-gray-50">
+                                                        <td className="px-4 py-4 whitespace-nowrap">
+                                                            <div className="text-sm font-medium text-gray-900">{estudiante.nombre}</div>
+                                                        </td>
+                                                        <td className="px-4 py-4 whitespace-nowrap">
+                                                            <div className="text-sm text-gray-500">{estudiante.codigo}</div>
+                                                        </td>
+                                                        {/* Celdas para cada tipo de nota */}
+                                                        {(tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []).map((tipo) => {
                                                             const notaActual = obtenerNotaPorTipo(estudiante.id, tipo.id)
-                                                            const claveTemporal = `${estudiante.id}-${tipo.id}`
-                                                            const valorTemporal = valoresTemporales[claveTemporal] !== undefined ? valoresTemporales[claveTemporal] : notaActual
-                                                            
                                                             return (
                                                                 <td key={tipo.id} className="px-3 py-4 whitespace-nowrap text-center">
                                                                     <input
-                                                                        type="text"
-                                                                        value={valorTemporal}
-                                                                        onChange={(e) => {
-                                                                            const valor = e.target.value;
-                                                                            console.log('🔄 Cambio detectado:', valor, 'para estudiante', estudiante.id, 'tipo', tipo.id);
-                                                                            
-                                                                            // Actualizar valor temporal
-                                                                            setValoresTemporales(prev => ({
-                                                                                ...prev,
-                                                                                [claveTemporal]: valor
-                                                                            }))
-                                                                        }}
-                                                                        onBlur={async (e) => {
-                                                                            console.log('👁️ Input perdió foco');
-                                                                            const valor = e.target.value;
-                                                                            const input = e.target;
-                                                                            
-                                                                            // Limpiar valor temporal
-                                                                            setValoresTemporales(prev => {
-                                                                                const nuevos = { ...prev }
-                                                                                delete nuevos[claveTemporal]
-                                                                                return nuevos
-                                                                            })
-                                                                            
-                                                                            // Validar y guardar
-                                                                            if (valor !== '') {
-                                                                                const valorLimpio = valor.replace(',', '.');
-                                                                                const nota = parseFloat(valorLimpio);
-                                                                                
-                                                                                if (isNaN(nota) || nota < 1.0 || nota > 5.0) {
-                                                                                    // Mostrar error y limpiar
-                                                                                    mostrarEstadoGuardado('❌ Nota inválida. Debe estar entre 1.0 y 5.0');
-                                                                                    input.style.backgroundColor = '#fef2f2'; // rojo claro
-                                                                                    input.style.borderColor = '#ef4444';
+                                                                        type="number"
+                                                                        min="1"
+                                                                        max="5"
+                                                                        step="0.1"
+                                                                        value={notaActual}
+                                                                        onChange={(e) => agregarNotaIndividual(estudiante.id, tipo.id, e.target.value)}
+                                                                        onBlur={() => {
+                                                                            // Mostrar feedback visual cuando se guarda
+                                                                            if (obtenerNotaPorTipo(estudiante.id, tipo.id)) {
+                                                                                const input = document.activeElement
+                                                                                if (input) {
+                                                                                    input.style.backgroundColor = '#dcfce7' // verde claro
                                                                                     setTimeout(() => {
-                                                                                        input.style.backgroundColor = '';
-                                                                                        input.style.borderColor = '';
-                                                                                    }, 2000);
-                                                                                    return;
-                                                                                }
-                                                                                
-                                                                                // Mostrar indicador de guardado
-                                                                                input.style.backgroundColor = '#fef3c7'; // amarillo claro
-                                                                                input.style.borderColor = '#f59e0b';
-                                                                                
-                                                                                try {
-                                                                                    // Guardar nota válida
-                                                                                    await agregarNotaIndividual(estudiante.id, tipo.id, valor);
-                                                                                    
-                                                                                    // Mostrar feedback de éxito
-                                                                                    input.style.backgroundColor = '#dcfce7'; // verde claro
-                                                                                    input.style.borderColor = '#22c55e';
-                                                                                    setTimeout(() => {
-                                                                                        input.style.backgroundColor = '';
-                                                                                        input.style.borderColor = '';
-                                                                                    }, 1500);
-                                                                                } catch (error) {
-                                                                                    // Mostrar feedback de error
-                                                                                    input.style.backgroundColor = '#fef2f2'; // rojo claro
-                                                                                    input.style.borderColor = '#ef4444';
-                                                                                    setTimeout(() => {
-                                                                                        input.style.backgroundColor = '';
-                                                                                        input.style.borderColor = '';
-                                                                                    }, 2000);
-                                                                                }
-                                                                            } else {
-                                                                                // Borrar nota si está vacía
-                                                                                try {
-                                                                                    await borrarNotaIndividual(estudiante.id, tipo.id);
-                                                                                    
-                                                                                    // Mostrar feedback de eliminación
-                                                                                    input.style.backgroundColor = '#f3f4f6'; // gris claro
-                                                                                    input.style.borderColor = '#6b7280';
-                                                                                    setTimeout(() => {
-                                                                                        input.style.backgroundColor = '';
-                                                                                        input.style.borderColor = '';
-                                                                                    }, 1000);
-                                                                                } catch (error) {
-                                                                                    console.error('Error eliminando nota:', error);
-                                                                                    // Mostrar feedback de error
-                                                                                    input.style.backgroundColor = '#fef2f2'; // rojo claro
-                                                                                    input.style.borderColor = '#ef4444';
-                                                                                    setTimeout(() => {
-                                                                                        input.style.backgroundColor = '';
-                                                                                        input.style.borderColor = '';
-                                                                                    }, 2000);
+                                                                                        input.style.backgroundColor = ''
+                                                                                    }, 1000)
                                                                                 }
                                                                             }
-                                                                        }}
-                                                                        onKeyDown={(e) => {
-                                                                            // Permitir teclas de navegación y edición
-                                                                            const allowedKeys = [
-                                                                                'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
-                                                                                'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-                                                                                'Home', 'End'
-                                                                            ];
-                                                                            
-                                                                            // Permitir números, punto y coma
-                                                                            if (allowedKeys.includes(e.key) || 
-                                                                                (e.key >= '0' && e.key <= '9') || 
-                                                                                e.key === '.' || 
-                                                                                e.key === ',') {
-                                                                                return;
-                                                                            }
-                                                                            
-                                                                            // Permitir Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-                                                                            if (e.ctrlKey && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) {
-                                                                                return;
-                                                                            }
-                                                                            
-                                                                            e.preventDefault();
                                                                         }}
                                                                         className="w-16 p-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                                                         placeholder="1.0"
-                                                                        inputMode="decimal"
                                                                     />
                                                                 </td>
                                                             )
-                                                        })
-                                                    })()}
-                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                        <span className="text-lg font-semibold text-blue-600">
-                                                            {promedioPeriodo.toFixed(1)}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${estadoPeriodo}`}>
-                                                            {promedioPeriodo >= 3.5 ? 'Aprobado' : promedioPeriodo >= 3.0 ? 'Suficiente' : 'Reprobado'}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })}
-                                    </tbody>
-                                </table>
+                                                        })}
+                                                        <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                            <span className="text-lg font-semibold text-blue-600">
+                                                                {promedioPeriodo.toFixed(1)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${estadoPeriodo}`}>
+                                                                {promedioPeriodo >= 3.5 ? 'Aprobado' : promedioPeriodo >= 3.0 ? 'Suficiente' : 'Reprobado'}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
-                    {/* Resumen de Estudiantes */}
-                    <div className="mt-6 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-6">
+                    {/* Resumen de notas del período - Vista mejorada como localStorage */}
+                    <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
                         <div className="flex justify-between items-center mb-4">
-                            <h4 className="text-lg font-semibold text-green-800 flex items-center">
-                                <UserGroupIcon className="h-5 w-5 text-green-600 mr-2" />
-                                Resumen de Estudiantes - Período {selectedPeriodo}
-                            </h4>
-                            <div className="text-sm text-green-600">
-                                Total: {estudiantes.length} estudiantes
+                            <h3 className="text-xl font-bold text-blue-800 flex items-center">
+                                <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                📊 Resumen de Notas - Período {selectedPeriodo}
+                            </h3>
+                            <button
+                                onClick={cargarNotasIndividuales}
+                                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm font-medium"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                🔄 Recargar desde BD
+                            </button>
+                        </div>
+
+                        {/* Información del período */}
+                        <div className="mb-4 p-3 bg-white rounded-lg border border-blue-100">
+                            <div className="flex items-center justify-between text-sm text-blue-700">
+                                <span className="font-medium">
+                                    📅 {periodosFormateados[selectedPeriodo]?.descripcion || `Período ${selectedPeriodo}`}
+                                </span>
+                                <span className="text-blue-600">
+                                    👥 {estudiantes.length} estudiantes registrados
+                                </span>
                             </div>
                         </div>
 
-                        {/* Estadísticas por estado */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                            <div className="bg-green-100 border border-green-200 rounded-lg p-4 text-center">
-                                <div className="text-green-800 font-bold text-2xl">
-                                    {estudiantes.filter(est => calcularPromedioPeriodo(est.id, selectedPeriodo) >= 3.5).length}
-                                </div>
-                                <div className="text-green-600 text-sm">Aprobados</div>
-                                <div className="text-green-500 text-xs">
-                                    ({estudiantes.length > 0 ? Math.round((estudiantes.filter(est => calcularPromedioPeriodo(est.id, selectedPeriodo) >= 3.5).length / estudiantes.length) * 100) : 0}%)
-                                </div>
-                            </div>
-                            <div className="bg-yellow-100 border border-yellow-200 rounded-lg p-4 text-center">
-                                <div className="text-yellow-800 font-bold text-2xl">
-                                    {estudiantes.filter(est => {
-                                        const prom = calcularPromedioPeriodo(est.id, selectedPeriodo)
-                                        return prom >= 3.0 && prom < 3.5
-                                    }).length}
-                                </div>
-                                <div className="text-yellow-600 text-sm">Suficientes</div>
-                                <div className="text-yellow-500 text-xs">
-                                    ({estudiantes.length > 0 ? Math.round((estudiantes.filter(est => {
-                                        const prom = calcularPromedioPeriodo(est.id, selectedPeriodo)
-                                        return prom >= 3.0 && prom < 3.5
-                                    }).length / estudiantes.length) * 100) : 0}%)
-                                </div>
-                            </div>
-                            <div className="bg-red-100 border border-red-200 rounded-lg p-4 text-center">
-                                <div className="text-red-800 font-bold text-2xl">
-                                    {estudiantes.filter(est => {
-                                        const prom = calcularPromedioPeriodo(est.id, selectedPeriodo)
-                                        return prom > 0 && prom < 3.0
-                                    }).length}
-                                </div>
-                                <div className="text-red-600 text-sm">Reprobados</div>
-                                <div className="text-red-500 text-xs">
-                                    ({estudiantes.length > 0 ? Math.round((estudiantes.filter(est => {
-                                        const prom = calcularPromedioPeriodo(est.id, selectedPeriodo)
-                                        return prom > 0 && prom < 3.0
-                                    }).length / estudiantes.length) * 100) : 0}%)
-                                </div>
-                            </div>
-                            <div className="bg-gray-100 border border-gray-200 rounded-lg p-4 text-center">
-                                <div className="text-gray-800 font-bold text-2xl">
-                                    {estudiantes.filter(est => calcularPromedioPeriodo(est.id, selectedPeriodo) === 0).length}
-                                </div>
-                                <div className="text-gray-600 text-sm">Sin notas</div>
-                                <div className="text-gray-500 text-xs">
-                                    ({estudiantes.length > 0 ? Math.round((estudiantes.filter(est => calcularPromedioPeriodo(est.id, selectedPeriodo) === 0).length / estudiantes.length) * 100) : 0}%)
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Lista detallada de estudiantes */}
-                        <div className="bg-white rounded-lg border border-green-200 overflow-hidden">
-                            <div className="p-4 border-b border-green-200 bg-green-50">
-                                <h5 className="font-semibold text-green-800">Detalle por Estudiante</h5>
-                            </div>
-                            <div className="overflow-auto max-h-[400px]">
+                        {/* Tabla de resumen mejorada */}
+                        <div className="bg-white rounded-lg border border-blue-200 overflow-hidden">
+                            <div className="overflow-auto max-h-[500px]">
                                 <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-green-50">
+                                    <thead className="bg-blue-50">
                                         <tr>
-                                            <th className="px-4 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider">
-                                                Estudiante
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-blue-600 uppercase tracking-wider">
+                                                👤 Estudiante
                                             </th>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-green-600 uppercase tracking-wider">
-                                                Código
+                                            <th className="px-3 py-3 text-left text-xs font-medium text-blue-600 uppercase tracking-wider">
+                                                🏷️ Código
                                             </th>
-                                            <th className="px-3 py-3 text-center text-xs font-medium text-green-600 uppercase tracking-wider">
-                                                Promedio
+                                            <th className="px-3 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider">
+                                                📝 Notas Registradas
                                             </th>
-                                            <th className="px-3 py-3 text-center text-xs font-medium text-green-600 uppercase tracking-wider">
-                                                Estado
+                                            <th className="px-3 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider">
+                                                📊 Promedio
                                             </th>
-                                            <th className="px-3 py-3 text-center text-xs font-medium text-green-600 uppercase tracking-wider">
-                                                Notas Registradas
+                                            <th className="px-3 py-3 text-center text-xs font-medium text-blue-600 uppercase tracking-wider">
+                                                🎯 Estado
                                             </th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {estudiantes.map((estudiante) => {
+                                            const notasPeriodo = notasMateria[estudiante.id]?.[`periodo${selectedPeriodo}`] || []
                                             const promedioPeriodo = calcularPromedioPeriodo(estudiante.id, selectedPeriodo)
                                             const estadoPeriodo = getEstadoNota(promedioPeriodo)
-                                            const notasPeriodo = notas[selectedMateria.id]?.[estudiante.id]?.[`periodo${selectedPeriodo}`] || []
 
                                             return (
-                                                <tr key={estudiante.id} className="hover:bg-green-50 transition-colors">
+                                                <tr key={estudiante.id} className="hover:bg-blue-50 transition-colors">
                                                     <td className="px-4 py-4 whitespace-nowrap">
                                                         <div className="flex items-center">
-                                                            <div className="flex-shrink-0 h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
-                                                                <span className="text-sm font-medium text-green-600">
+                                                            <div className="flex-shrink-0 h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                                                <span className="text-sm font-medium text-blue-600">
                                                                     {estudiante.nombre.charAt(0).toUpperCase()}
                                                                 </span>
                                                             </div>
@@ -1859,27 +1302,12 @@ export default function Materias() {
                                                         </div>
                                                     </td>
                                                     <td className="px-3 py-4 whitespace-nowrap text-center">
-                                                        <span className={`text-lg font-bold ${estadoPeriodo}`}>
-                                                            {promedioPeriodo > 0 ? promedioPeriodo.toFixed(1) : '--'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-3 py-4 whitespace-nowrap text-center">
-                                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${promedioPeriodo >= 3.5 ? 'bg-green-100 text-green-800' :
-                                                                promedioPeriodo >= 3.0 ? 'bg-yellow-100 text-yellow-800' :
-                                                                    promedioPeriodo > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                                                            }`}>
-                                                            {promedioPeriodo >= 3.5 ? '✅ Aprobado' :
-                                                                promedioPeriodo >= 3.0 ? '⚠️ Suficiente' :
-                                                                    promedioPeriodo > 0 ? '❌ Reprobado' : '⏳ Sin notas'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-3 py-4 whitespace-nowrap text-center">
                                                         <div className="flex flex-wrap gap-1 justify-center">
                                                             {notasPeriodo.length > 0 ? (
                                                                 notasPeriodo.map((nota) => (
                                                                     <span
                                                                         key={nota.id}
-                                                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
                                                                         title={`${nota.titulo}: ${nota.valor}`}
                                                                     >
                                                                         {nota.valor}
@@ -1893,6 +1321,23 @@ export default function Materias() {
                                                             {notasPeriodo.length} nota{notasPeriodo.length !== 1 ? 's' : ''}
                                                         </div>
                                                     </td>
+                                                    <td className="px-3 py-4 whitespace-nowrap text-center">
+                                                        <div className="flex items-center justify-center">
+                                                            <span className={`text-lg font-bold ${estadoPeriodo}`}>
+                                                                {promedioPeriodo > 0 ? promedioPeriodo.toFixed(1) : '--'}
+                                                            </span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-4 whitespace-nowrap text-center">
+                                                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${promedioPeriodo >= 3.5 ? 'bg-green-100 text-green-800' :
+                                                                promedioPeriodo >= 3.0 ? 'bg-yellow-100 text-yellow-800' :
+                                                                    promedioPeriodo > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                                                            }`}>
+                                                            {promedioPeriodo >= 3.5 ? '✅ Aprobado' :
+                                                                promedioPeriodo >= 3.0 ? '⚠️ Suficiente' :
+                                                                    promedioPeriodo > 0 ? '❌ Reprobado' : '⏳ Sin notas'}
+                                                        </span>
+                                                    </td>
                                                 </tr>
                                             )
                                         })}
@@ -1900,8 +1345,61 @@ export default function Materias() {
                                 </table>
                             </div>
                         </div>
-                    </div>
 
+                        {/* Resumen estadístico */}
+                        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="bg-green-100 border border-green-200 rounded-lg p-3 text-center">
+                                <div className="text-green-800 font-bold text-lg">
+                                    {estudiantes.filter(est => calcularPromedioPeriodo(est.id, selectedPeriodo) >= 3.5).length}
+                                </div>
+                                <div className="text-green-600 text-xs">Aprobados</div>
+                            </div>
+                            <div className="bg-yellow-100 border border-yellow-200 rounded-lg p-3 text-center">
+                                <div className="text-yellow-800 font-bold text-lg">
+                                    {estudiantes.filter(est => {
+                                        const prom = calcularPromedioPeriodo(est.id, selectedPeriodo)
+                                        return prom >= 3.0 && prom < 3.5
+                                    }).length}
+                                </div>
+                                <div className="text-yellow-600 text-xs">Suficientes</div>
+                            </div>
+                            <div className="bg-red-100 border border-red-200 rounded-lg p-3 text-center">
+                                <div className="text-red-800 font-bold text-lg">
+                                    {estudiantes.filter(est => {
+                                        const prom = calcularPromedioPeriodo(est.id, selectedPeriodo)
+                                        return prom > 0 && prom < 3.0
+                                    }).length}
+                                </div>
+                                <div className="text-red-600 text-xs">Reprobados</div>
+                            </div>
+                            <div className="bg-gray-100 border border-gray-200 rounded-lg p-3 text-center">
+                                <div className="text-gray-800 font-bold text-lg">
+                                    {estudiantes.filter(est => calcularPromedioPeriodo(est.id, selectedPeriodo) === 0).length}
+                                </div>
+                                <div className="text-gray-600 text-xs">Sin notas</div>
+                            </div>
+                        </div>
+
+                        {/* Mensaje si no hay notas */}
+                        {estudiantes.every(est => (notasMateria[est.id]?.[`periodo${selectedPeriodo}`] || []).length === 0) && (
+                            <div className="mt-4 text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <h3 className="mt-2 text-lg font-medium text-gray-900">No hay notas registradas</h3>
+                                <p className="mt-1 text-gray-500">Para el Período {selectedPeriodo} aún no se han registrado notas</p>
+                                <div className="mt-4">
+                                    <button
+                                        onClick={() => setShowAddTipoNotaModal(true)}
+                                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
+                                    >
+                                        <PlusIcon className="w-4 h-4" />
+                                        Agregar Primera Evaluación
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Modal para agregar estudiante */}
@@ -2111,18 +1609,8 @@ export default function Materias() {
 
                         {/* Indicador de estado */}
                         {autoSaveStatus && (
-                            <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${
-                                autoSaveStatus.includes('✅') 
-                                    ? 'bg-green-100 text-green-800 border-green-200' 
-                                    : autoSaveStatus.includes('❌') 
-                                        ? 'bg-red-100 text-red-800 border-red-200' 
-                                        : 'bg-blue-100 text-blue-800 border-blue-200'
-                            }`}>
-                                <div className="flex items-center gap-2">
-                                    {autoSaveStatus.includes('✅') && <span>✅</span>}
-                                    {autoSaveStatus.includes('❌') && <span>❌</span>}
-                                    <span>{autoSaveStatus}</span>
-                                </div>
+                            <div className="bg-green-100 text-green-800 px-3 py-2 rounded-lg text-sm font-medium border border-green-200 animate-pulse">
+                                {autoSaveStatus}
                             </div>
                         )}
                         <button

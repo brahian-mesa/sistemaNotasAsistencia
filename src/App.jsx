@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import LoadingSpinner from './components/LoadingSpinner'
 import MigrationStatus from './components/MigrationStatus'
 import ConnectionStatus from './components/ConnectionStatus'
+import DiagnosticPanel from './components/DiagnosticPanel'
 import auth from './utils/auth'
 import { checkDatabaseTables, initializeDefaultData, testDatabaseConnection } from './utils/check-database'
 
@@ -156,6 +157,7 @@ function AppRoutes() {
     <ErrorBoundary>
       <MigrationStatus />
       <ConnectionStatus />
+      <DiagnosticPanel />
       <Suspense fallback={<AppLoadingSpinner />}>
       <Routes>
         {/* Rutas públicas */}

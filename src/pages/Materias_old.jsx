@@ -554,7 +554,11 @@ export default function Materias() {
                 created_at: new Date().toISOString()
             }
 
-            setEstudiantes(prev => [...prev, estudianteTemporal].sort((a, b) => a.codigo.localeCompare(b.codigo)))
+            setEstudiantes(prev => [...prev, estudianteTemporal].sort((a, b) => {
+                const codigoA = parseInt(a.codigo) || 0;
+                const codigoB = parseInt(b.codigo) || 0;
+                return codigoA - codigoB;
+            }))
             setStudentForm({ nombre: '', codigo: '' })
             setShowAddStudentModal(false)
 

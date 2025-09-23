@@ -168,7 +168,11 @@ export default function Asistencia() {
             const estudianteGuardado = await db.guardarEstudiante(nuevoEstudiante)
 
             // Actualizar lista local
-            setEstudiantes(prev => [...prev, estudianteGuardado].sort((a, b) => a.codigo.localeCompare(b.codigo)))
+            setEstudiantes(prev => [...prev, estudianteGuardado].sort((a, b) => {
+                const codigoA = parseInt(a.codigo) || 0;
+                const codigoB = parseInt(b.codigo) || 0;
+                return codigoA - codigoB;
+            }))
             setStudentForm({ nombre: '', codigo: '' })
             setShowAddStudentModal(false)
 
@@ -218,7 +222,11 @@ export default function Asistencia() {
 
             setMaterias(materiasUsuario)
             // Ordenar estudiantes por código automáticamente
-            setEstudiantes(estudiantesUsuario.sort((a, b) => a.codigo.localeCompare(b.codigo)))
+            setEstudiantes(estudiantesUsuario.sort((a, b) => {
+                const codigoA = parseInt(a.codigo) || 0;
+                const codigoB = parseInt(b.codigo) || 0;
+                return codigoA - codigoB;
+            }))
 
 
             

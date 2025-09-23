@@ -45,11 +45,17 @@ class LocalDatabase {
         .from("estudiantes")
         .select("*")
         .eq("usuario_id", currentUser?.id)
-        .order("codigo")
         .limit(1000); // Limitar resultados para mejor rendimiento
 
       if (error) throw error;
-      return data || [];
+      
+      // Ordenar numéricamente por código
+      const estudiantes = data || [];
+      return estudiantes.sort((a, b) => {
+        const codigoA = parseInt(a.codigo) || 0;
+        const codigoB = parseInt(b.codigo) || 0;
+        return codigoA - codigoB;
+      });
     } catch (error) {
       console.error("Error obteniendo estudiantes:", error);
       return [];

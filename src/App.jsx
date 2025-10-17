@@ -6,7 +6,6 @@ import ErrorBoundary from './components/ErrorBoundary'
 import LoadingSpinner from './components/LoadingSpinner'
 import MigrationStatus from './components/MigrationStatus'
 import ConnectionStatus from './components/ConnectionStatus'
-import DiagnosticPanel from './components/DiagnosticPanel'
 import auth from './utils/auth'
 import { checkDatabaseTables, initializeDefaultData, testDatabaseConnection } from './utils/check-database'
 
@@ -56,7 +55,7 @@ function ProtectedRoute({ children, allowSetup = false, requireSetup = false }) 
 function PublicRoute({ children }) {
   const isAuthenticated = auth.isAuthenticated();
   const currentUser = auth.getCurrentUser();
-  
+
   if (isAuthenticated) {
     // Usuario autenticado siempre va al home, independientemente del setup
     console.log('🔄 Redirigiendo a /home (usuario autenticado)');
@@ -86,7 +85,7 @@ function AppRoutes() {
     const initializeApp = async () => {
       try {
         console.log('🚀 Inicializando aplicación...');
-        
+
         // Verificar conexión a la base de datos
         const connectionTest = await testDatabaseConnection();
         if (!connectionTest.success) {
@@ -157,7 +156,6 @@ function AppRoutes() {
     <ErrorBoundary>
       <MigrationStatus />
       <ConnectionStatus />
-      <DiagnosticPanel />
       <Suspense fallback={<AppLoadingSpinner />}>
       <Routes>
         {/* Rutas públicas */}
@@ -228,7 +226,7 @@ function AppRoutes() {
             </DashboardLayout>
           </ProtectedRoute>
         } />
-        
+
         <Route path="/notas" element={
           <ProtectedRoute>
             <FileNotification />
@@ -261,7 +259,7 @@ function AppRoutes() {
             </DashboardLayout>
           </ProtectedRoute>
         } />
-        
+
         {/* Ruta para pruebas de relaciones de base de datos */}
         <Route path="/database-test" element={
           <ProtectedRoute>
@@ -271,9 +269,9 @@ function AppRoutes() {
             </DashboardLayout>
           </ProtectedRoute>
         } />
-        
+
         {/* Ruta de diagnóstico */}
-        
+
         {/* Ruta temporal para pruebas de Supabase - Comentada temporalmente */}
         {/* <Route path="/supabase-test" element={
           <ProtectedRoute>

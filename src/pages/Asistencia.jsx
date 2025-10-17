@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
-import { ChevronDownIcon, ChevronUpIcon, UserGroupIcon, CalendarIcon, ChartBarIcon, UserPlusIcon } from '@heroicons/react/24/outline'
-import PageContainer from '../components/PageContainer'
+import { CalendarIcon, ChartBarIcon, ChevronUpIcon, UserGroupIcon, UserPlusIcon } from '@heroicons/react/24/outline'
+import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
-import db from '../utils/database'
+import PageContainer from '../components/PageContainer'
 import auth from '../utils/auth'
+import db from '../utils/database'
 import supabase from '../utils/supabase'
-import { testAttendanceSave, testMultipleAttendance } from '../utils/test-attendance'
 
 export default function Asistencia() {
     const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0])
@@ -16,7 +15,7 @@ export default function Asistencia() {
     // Obtener períodos académicos de la base de datos
     const [periodosAcademicos, setPeriodosAcademicos] = useState({})
 
-    
+
     // Formatear períodos para mostrar - valores por defecto
     const periodosFormateados = {
         1: {
@@ -229,9 +228,9 @@ export default function Asistencia() {
             }))
 
 
-            
 
-           
+
+
 
         } catch (error) {
             mostrarEstadoGuardado(`❌ Error cargando datos: ${error.message}`)
@@ -360,18 +359,44 @@ export default function Asistencia() {
             const periodoInfo = periodosAcademicos[periodoSeleccionado] || periodosFormateados[periodoSeleccionado]
 
 
-            // Obtener todas las asistencias del período desde Supabase
-            const { data: asistenciasDB, error } = await supabase
-                .from('asistencias')
-                .select('*')
-                .gte('fecha', periodoInfo.fechaInicio)
-                .lte('fecha', periodoInfo.fechaFin)
-                .eq('usuario_id', auth.getCurrentUser()?.id);
+            // Obtener TODAS las asistencias del período usando paginación
+            let asistenciasDB = []
+            let desde = 0
+            const limite = 1000
+            let hayMasRegistros = true
 
-            if (error) {
-                console.error('❌ Error obteniendo asistencias:', error);
-                return [];
+            console.log('🔄 Cargando asistencias para estadísticas con paginación...')
+
+            while (hayMasRegistros) {
+                const { data, error, count } = await supabase
+                    .from('asistencias')
+                    .select('*', { count: 'exact' })
+                    .gte('fecha', periodoInfo.fechaInicio)
+                    .lte('fecha', periodoInfo.fechaFin)
+                    .eq('usuario_id', auth.getCurrentUser()?.id)
+                    .order('fecha', { ascending: true })
+                    .range(desde, desde + limite - 1);
+
+                if (error) {
+                    console.error('❌ Error obteniendo asistencias para estadísticas:', error);
+                    return [];
+                }
+
+                if (data && data.length > 0) {
+                    asistenciasDB = [...asistenciasDB, ...data]
+                    console.log(`📦 Estadísticas: Descargados ${data.length} registros (total: ${asistenciasDB.length}/${count})`)
+
+                    if (data.length < limite) {
+                        hayMasRegistros = false
+                    } else {
+                        desde += limite
+                    }
+                } else {
+                    hayMasRegistros = false
+                }
             }
+
+            console.log('📊 Estadísticas: Total de registros obtenidos:', asistenciasDB.length);
 
 
             const estadisticas = []
@@ -421,8 +446,10 @@ export default function Asistencia() {
         }
     }
 
-    // Exportar estadísticas a Excel - MEJORADO
+    // Exportar estadísticas a Excel - MEJORADO CON LOGS
     const exportarEstadisticasExcel = async () => {
+        console.log('📊 Iniciando exportación de estadísticas...')
+        console.log('📊 Estadísticas disponibles:', estadisticas.length)
 
         if (!estadisticas || estadisticas.length === 0) {
             alert('⚠️ No hay estadísticas para exportar. Primero marca algunas asistencias.')
@@ -433,6 +460,10 @@ export default function Asistencia() {
             const periodoInfoExport = periodosAcademicos[periodoSeleccionado] || periodosFormateados[periodoSeleccionado]
             const currentUser = auth.getCurrentUser()
             const wb = XLSX.utils.book_new()
+
+            console.log('📅 Período a exportar:', periodoInfoExport?.nombre || `Período ${periodoSeleccionado}`)
+            console.log('👥 Total de estudiantes:', estadisticas.length)
+            console.log('📚 Total de materias:', materias.length)
 
             // Calcular totales generales
             const totalFaltasGeneral = estadisticas.reduce((sum, est) => sum + est.totalFaltas, 0)
@@ -479,9 +510,9 @@ export default function Asistencia() {
                 // Totales del estudiante
                 filaEstudiante.push(est.totalFaltas)
                 filaEstudiante.push(est.totalAsistencias)
-                
+
                 // Porcentaje de faltas del estudiante
-                const porcentajeFaltas = est.totalAsistencias > 0 ? 
+                const porcentajeFaltas = est.totalAsistencias > 0 ?
                     ((est.totalFaltas / est.totalAsistencias) * 100).toFixed(1) : '0'
                 filaEstudiante.push(`${porcentajeFaltas}%`)
 
@@ -491,7 +522,7 @@ export default function Asistencia() {
             // Agregar fila de totales por materia
             const filaTotales = ['TOTALES', '']
             materias.forEach(materia => {
-                const totalMateria = estadisticas.reduce((sum, est) => 
+                const totalMateria = estadisticas.reduce((sum, est) =>
                     sum + (est.faltasPorMateria[materia.codigo] || 0), 0)
                 filaTotales.push(totalMateria)
             })
@@ -523,32 +554,80 @@ export default function Asistencia() {
             // Descargar
             XLSX.writeFile(wb, nombreArchivo)
 
+            console.log('✅ ¡Exportación de estadísticas completada exitosamente!')
+            console.log(`📊 Archivo: ${nombreArchivo}`)
+            console.log(`👥 Estudiantes: ${estadisticas.length}`)
+            console.log(`📚 Materias: ${materias.length}`)
+            console.log(`📋 Total de faltas: ${totalFaltasGeneral}`)
+            console.log(`📋 Total de asistencias: ${totalAsistenciasGeneral}`)
+
+            alert(`✅ ¡Exportación de estadísticas completada!\n\n` +
+                  `📊 Archivo: ${nombreArchivo}\n` +
+                  `👥 Estudiantes: ${estadisticas.length}\n` +
+                  `📚 Materias: ${materias.length}\n` +
+                  `📋 Total de faltas: ${totalFaltasGeneral}\n` +
+                  `📋 Total de asistencias: ${totalAsistenciasGeneral}\n\n` +
+                  `✓ El archivo se ha descargado correctamente`)
 
         } catch (error) {
+            console.error('❌ Error completo al exportar estadísticas:', error)
             alert(`❌ Error al exportar: ${error.message}`)
         }
     }
 
-    // Exportar a Excel con asistencias del período seleccionado - CORREGIDO
+    // Exportar a Excel con asistencias del período seleccionado - CORREGIDO CON LÍMITE EXPANDIDO
     const exportarAsistenciaExcel = async () => {
         try {
 
             const periodoInfoRegistro = periodosAcademicos[periodoSeleccionado] || periodosFormateados[periodoSeleccionado]
             const currentUser = auth.getCurrentUser()
 
-            // Obtener todas las asistencias del período desde Supabase
-            const { data: todasAsistencias, error } = await supabase
-                .from('asistencias')
-                .select('*')
-                .gte('fecha', periodoInfoRegistro.fechaInicio)
-                .lte('fecha', periodoInfoRegistro.fechaFin)
-                .eq('usuario_id', currentUser?.id)
+            console.log('📊 Exportando asistencias del período:', periodoInfoRegistro)
+            console.log('📅 Rango de fechas:', periodoInfoRegistro.fechaInicio, 'al', periodoInfoRegistro.fechaFin)
 
-            if (error) {
-                console.error('❌ Error obteniendo asistencias:', error)
-                alert(`❌ Error obteniendo datos: ${error.message}`)
-                return
+            // Obtener TODAS las asistencias del período usando paginación
+            // Supabase tiene un límite de 1000 registros por defecto, así que necesitamos paginación
+            let todasAsistencias = []
+            let desde = 0
+            const limite = 1000
+            let hayMasRegistros = true
+
+            console.log('🔄 Iniciando descarga de asistencias con paginación...')
+
+            while (hayMasRegistros) {
+                const { data, error, count } = await supabase
+                    .from('asistencias')
+                    .select('*', { count: 'exact' })
+                    .gte('fecha', periodoInfoRegistro.fechaInicio)
+                    .lte('fecha', periodoInfoRegistro.fechaFin)
+                    .eq('usuario_id', currentUser?.id)
+                    .order('fecha', { ascending: true })
+                    .order('estudiante_id', { ascending: true })
+                    .range(desde, desde + limite - 1)
+
+                if (error) {
+                    console.error('❌ Error obteniendo asistencias:', error)
+                    alert(`❌ Error obteniendo datos: ${error.message}`)
+                    return
+                }
+
+                if (data && data.length > 0) {
+                    todasAsistencias = [...todasAsistencias, ...data]
+                    console.log(`📦 Descargados ${data.length} registros (total acumulado: ${todasAsistencias.length}/${count})`)
+
+                    // Si obtuvimos menos registros que el límite, ya no hay más
+                    if (data.length < limite) {
+                        hayMasRegistros = false
+                    } else {
+                        desde += limite
+                    }
+                } else {
+                    hayMasRegistros = false
+                }
             }
+
+            console.log('✅ Descarga completa!')
+            console.log('📊 Total de registros obtenidos:', todasAsistencias.length)
 
             if (!todasAsistencias || todasAsistencias.length === 0) {
                 const nombrePeriodo = periodosAcademicos[periodoSeleccionado]?.nombre || `Período ${periodoSeleccionado}`
@@ -556,20 +635,29 @@ export default function Asistencia() {
                 return
             }
 
+            console.log('🔍 Muestra de asistencias obtenidas:', todasAsistencias.slice(0, 5))
 
-            
             // Obtener todas las fechas únicas del período y ordenarlas
             const fechasUnicas = [...new Set(todasAsistencias.map(a => a.fecha))].sort()
+            console.log('📅 Fechas únicas encontradas:', fechasUnicas.length, 'fechas')
+            console.log('📅 Primera y última fecha:', fechasUnicas[0], '-', fechasUnicas[fechasUnicas.length - 1])
 
             // Convertir asistencias a formato fácil de usar (agrupar por estudiante y fecha)
+            // MEJORADO: Priorizar ausente si hay al menos una falta en cualquier materia ese día
             const asistenciasFormateadas = {}
             todasAsistencias.forEach(asistencia => {
                 const clave = `${asistencia.fecha}-${asistencia.estudiante_id}`
-                // Si ya existe, mantener el estado (priorizar ausente sobre presente)
-                if (!asistenciasFormateadas[clave] || asistencia.estado === 'ausente') {
+                // Si ya existe una ausencia, mantenerla; si no, actualizar
+                if (!asistenciasFormateadas[clave]) {
                     asistenciasFormateadas[clave] = asistencia.estado
+                } else if (asistencia.estado === 'ausente') {
+                    // Priorizar ausente: si hay al menos una falta, marcar como ausente
+                    asistenciasFormateadas[clave] = 'ausente'
                 }
             })
+
+            console.log('📋 Total de claves de asistencia únicas:', Object.keys(asistenciasFormateadas).length)
+            console.log('🔍 Muestra de asistencias formateadas:', Object.entries(asistenciasFormateadas).slice(0, 5))
 
             // Crear datos del reporte
             const datosHoja = [
@@ -599,10 +687,13 @@ export default function Asistencia() {
 
             datosHoja.push(encabezados)
 
-            // Datos de estudiantes
+            // Datos de estudiantes - MEJORADO CON LOGS DE DEPURACIÓN
+            console.log('👥 Procesando', estudiantes.length, 'estudiantes')
             estudiantes.forEach((estudiante, index) => {
                 const filaEstudiante = [index + 1, estudiante.codigo, estudiante.nombre]
                 let totalFaltas = 0
+                let presentes = 0
+                let sinRegistro = 0
 
                 fechasUnicas.forEach(fecha => {
                     const claveAsistencia = `${fecha}-${estudiante.id}`
@@ -610,17 +701,30 @@ export default function Asistencia() {
 
                     if (estadoAsistencia === 'presente') {
                         filaEstudiante.push('X') // Presente
+                        presentes++
                     } else if (estadoAsistencia === 'ausente') {
                         filaEstudiante.push('F') // Falta
                         totalFaltas++
                     } else {
                         filaEstudiante.push('') // Sin registro
+                        sinRegistro++
                     }
                 })
 
                 filaEstudiante.push(totalFaltas)
                 datosHoja.push(filaEstudiante)
+
+                // Log para el primer estudiante como muestra
+                if (index === 0) {
+                    console.log('📊 Estudiante muestra:', estudiante.nombre)
+                    console.log('  - Presentes:', presentes)
+                    console.log('  - Faltas:', totalFaltas)
+                    console.log('  - Sin registro:', sinRegistro)
+                    console.log('  - Total fechas procesadas:', fechasUnicas.length)
+                }
             })
+
+            console.log('✅ Total de filas de datos generadas:', estudiantes.length)
 
             // Crear workbook y worksheet
             const wb = XLSX.utils.book_new()
@@ -646,8 +750,26 @@ export default function Asistencia() {
             // Descargar archivo
             XLSX.writeFile(wb, nombreArchivo)
 
+            // Mensaje de éxito con información detallada
+            const totalRegistros = todasAsistencias.length
+            const totalEstudiantes = estudiantes.length
+            const totalFechas = fechasUnicas.length
+
+            console.log('✅ ¡Exportación completada exitosamente!')
+            console.log(`📊 Archivo: ${nombreArchivo}`)
+            console.log(`👥 Estudiantes: ${totalEstudiantes}`)
+            console.log(`📅 Fechas: ${totalFechas}`)
+            console.log(`📋 Registros totales: ${totalRegistros}`)
+
+            alert(`✅ ¡Exportación completada!\n\n` +
+                  `📊 Archivo: ${nombreArchivo}\n` +
+                  `👥 Estudiantes: ${totalEstudiantes}\n` +
+                  `📅 Fechas registradas: ${totalFechas}\n` +
+                  `📋 Total de asistencias: ${totalRegistros}\n\n` +
+                  `✓ El archivo se ha descargado correctamente`)
 
         } catch (error) {
+            console.error('❌ Error completo:', error)
             alert(`❌ Error al exportar archivo Excel: ${error.message}`)
         }
     }
@@ -1037,7 +1159,7 @@ export default function Asistencia() {
                                                 {periodosAcademicos[periodoSeleccionado]?.descripcion || periodosFormateados[periodoSeleccionado]?.descripcion}
                                             </p>
                                         </div>
-                                        
+
                                         {/* Resumen de estadísticas */}
                                         {estadisticas.length > 0 && (
                                             <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -1178,14 +1300,14 @@ export default function Asistencia() {
                                                 </tr>
                                             )
                                         })}
-                                        
+
                                         {/* Fila de totales */}
                                         <tr className="bg-blue-100 font-bold">
                                             <td className="border border-blue-200 p-3 text-blue-800" colSpan="2">
                                                 TOTALES
                                             </td>
                                             {materias.map(materia => {
-                                                const totalMateria = estadisticas.reduce((sum, est) => 
+                                                const totalMateria = estadisticas.reduce((sum, est) =>
                                                     sum + (est.faltasPorMateria[materia.codigo] || 0), 0)
                                                 return (
                                                     <td key={materia.codigo} className="border border-blue-200 p-3 text-center text-blue-800">

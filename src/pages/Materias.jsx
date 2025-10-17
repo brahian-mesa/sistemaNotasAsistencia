@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
-import { PlusIcon, PencilIcon, TrashIcon, BookOpenIcon, AcademicCapIcon, ArrowLeftIcon, UserPlusIcon, CheckCircleIcon, XCircleIcon, ClipboardDocumentListIcon, UserGroupIcon } from '@heroicons/react/24/outline'
-import PageContainer from '../components/PageContainer'
+import { AcademicCapIcon, ArrowLeftIcon, BookOpenIcon, CheckCircleIcon, PencilIcon, PlusIcon, TrashIcon, UserGroupIcon, UserPlusIcon, XCircleIcon } from '@heroicons/react/24/outline'
+import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
-import db from '../utils/database'
+import PageContainer from '../components/PageContainer'
 import auth from '../utils/auth'
+import db from '../utils/database'
 import supabase from '../utils/supabase'
 
 export default function Materias() {
@@ -124,27 +124,54 @@ export default function Materias() {
                 return;
             }
 
-            // Construir query base
-            let query = supabase
-                .from('notas_individuales')
-                .select('*')
-                .eq('usuario_id', currentUser.id);
+            // Obtener TODAS las notas usando paginación
+            // Supabase tiene un límite de 1000 registros por defecto
+            let notasDB = []
+            let desde = 0
+            const limite = 1000
+            let hayMasRegistros = true
 
-            // Si se especifica una materia, filtrar por ella
-            if (materiaId) {
-                query = query.eq('materia_id', materiaId);
-                console.log(`🔍 Cargando notas específicas para materia ID: ${materiaId}`);
+            console.log('🔄 Iniciando carga de notas con paginación...')
+
+            while (hayMasRegistros) {
+                // Construir query base
+                let query = supabase
+                    .from('notas_individuales')
+                    .select('*', { count: 'exact' })
+                    .eq('usuario_id', currentUser.id)
+                    .order('created_at', { ascending: false })
+                    .range(desde, desde + limite - 1);
+
+                // Si se especifica una materia, filtrar por ella
+                if (materiaId) {
+                    query = query.eq('materia_id', materiaId);
+                }
+
+                const { data, error, count } = await query;
+
+                if (error) {
+                    console.error('❌ Error obteniendo notas individuales:', error);
+                    mostrarEstadoGuardado('❌ Error cargando notas desde BD');
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    notasDB = [...notasDB, ...data]
+                    console.log(`📦 Descargadas ${data.length} notas (total acumulado: ${notasDB.length}/${count || '?'})`)
+
+                    // Si obtuvimos menos registros que el límite, ya no hay más
+                    if (data.length < limite) {
+                        hayMasRegistros = false
+                    } else {
+                        desde += limite
+                    }
+                } else {
+                    hayMasRegistros = false
+                }
             }
 
-            const { data: notasDB, error } = await query.order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('❌ Error obteniendo notas individuales:', error);
-                mostrarEstadoGuardado('❌ Error cargando notas desde BD');
-                return;
-            }
-
-            console.log('📊 Notas individuales obtenidas:', notasDB.length);
+            console.log('✅ Carga completa!')
+            console.log('📊 Total de notas individuales obtenidas:', notasDB.length);
 
             // Convertir a formato del estado local
             const notasFormateadas = {};
@@ -222,7 +249,7 @@ export default function Materias() {
                 }, 0);
             }, 0);
 
-            const mensaje = materiaId 
+            const mensaje = materiaId
                 ? `✅ ${totalNotas} notas cargadas para esta materia desde BD`
                 : `✅ ${totalNotas} notas cargadas desde BD`;
             mostrarEstadoGuardado(mensaje);
@@ -270,7 +297,7 @@ export default function Materias() {
                 [selectedMateria.id]: notasIndividuales
             }));
             console.log('✅ Notas individuales cargadas desde BD:', notasIndividuales);
-            
+
             // Mostrar estructura de datos para debug
             console.log('📋 Estructura de notas cargadas:');
             Object.keys(notasIndividuales).forEach(estudianteId => {
@@ -316,28 +343,28 @@ export default function Materias() {
 
         // Crear algunas notas de prueba
         const nuevasNotas = { ...notasMateria };
-        
+
         estudiantes.slice(0, 3).forEach((estudiante, index) => {
             const estudianteId = estudiante.id;
             const periodoKey = `periodo${selectedPeriodo}`;
-            
+
             if (!nuevasNotas[estudianteId]) {
                 nuevasNotas[estudianteId] = {};
             }
             if (!nuevasNotas[estudianteId][periodoKey]) {
                 nuevasNotas[estudianteId][periodoKey] = [];
             }
-            
+
             // Agregar notas de prueba
             const notasPrueba = [
                 { id: `prueba-${estudianteId}-1`, tipoNotaId: 'quiz', titulo: 'Quiz', valor: 3.5 + index * 0.5 },
                 { id: `prueba-${estudianteId}-2`, tipoNotaId: 'tarea', titulo: 'Tarea', valor: 4.0 + index * 0.2 },
                 { id: `prueba-${estudianteId}-3`, tipoNotaId: 'examen', titulo: 'Examen', valor: 3.8 + index * 0.3 }
             ];
-            
+
             nuevasNotas[estudianteId][periodoKey] = notasPrueba;
         });
-        
+
         // También agregar tipos de nota de prueba
         const nuevosTiposNota = { ...tiposNotaPeriodo };
         if (!nuevosTiposNota[selectedMateria.id]) {
@@ -346,20 +373,20 @@ export default function Materias() {
         if (!nuevosTiposNota[selectedMateria.id][selectedPeriodo]) {
             nuevosTiposNota[selectedMateria.id][selectedPeriodo] = [];
         }
-        
+
         const tiposPrueba = [
             { id: 'quiz', titulo: 'Quiz', descripcion: 'Evaluación rápida' },
             { id: 'tarea', titulo: 'Tarea', descripcion: 'Trabajo en casa' },
             { id: 'examen', titulo: 'Examen', descripcion: 'Evaluación formal' }
         ];
-        
+
         nuevosTiposNota[selectedMateria.id][selectedPeriodo] = tiposPrueba;
         setTiposNotaPeriodo(nuevosTiposNota);
-        
+
         setNotasMateria(nuevasNotas);
         console.log('✅ Notas de prueba agregadas:', nuevasNotas);
         console.log('✅ Tipos de nota agregados:', nuevosTiposNota);
-        
+
         setAutoSaveStatus('✅ Notas y tipos de prueba agregados');
         setTimeout(() => setAutoSaveStatus(''), 3000);
     }
@@ -788,14 +815,14 @@ export default function Materias() {
 
     const agregarNotaIndividual = async (estudianteId, tipoNotaId, valor) => {
         console.log('🎯 Procesando nota:', { estudianteId, tipoNotaId, valor, materia: selectedMateria?.id, periodo: selectedPeriodo });
-        
+
         try {
             // Validaciones básicas
             if (!selectedMateria?.id || !estudianteId || !tipoNotaId) {
                 mostrarEstadoGuardado('❌ Error: Datos incompletos');
                 return;
             }
-            
+
             // Si el valor está vacío, borrar la nota
             if (valor === '' || valor === null || valor === undefined) {
                 console.log('🗑️ Valor vacío - eliminando nota');
@@ -806,7 +833,7 @@ export default function Materias() {
             // Limpiar y validar el valor
             const valorLimpio = valor.toString().replace(',', '.');
             const nota = parseFloat(valorLimpio);
-            
+
             if (isNaN(nota) || nota < 1.0 || nota > 5.0) {
                 mostrarEstadoGuardado('❌ Nota inválida. Debe estar entre 1.0 y 5.0');
                 return;
@@ -816,7 +843,7 @@ export default function Materias() {
             const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || [];
             const tiposExistentes = obtenerTiposNotaExistentes();
             const tipoNota = [...tiposManuales, ...tiposExistentes].find(t => t.id === tipoNotaId);
-            
+
             if (!tipoNota) {
                 mostrarEstadoGuardado('❌ Error: Tipo de nota no encontrado');
                 return;
@@ -827,10 +854,10 @@ export default function Materias() {
             const notaExistente = notas[selectedMateria.id]?.[estudianteId]?.[periodoKey]?.find(n => n.tipoId === tipoNotaId);
             const esActualizacion = !!notaExistente;
 
-            console.log(`🔄 ${esActualizacion ? 'Actualizando' : 'Creando'} nota:`, { 
-                tipo: tipoNota.titulo, 
-                valor: nota, 
-                existente: esActualizacion 
+            console.log(`🔄 ${esActualizacion ? 'Actualizando' : 'Creando'} nota:`, {
+                tipo: tipoNota.titulo,
+                valor: nota,
+                existente: esActualizacion
             });
 
             // Guardar/actualizar en la base de datos usando UPSERT
@@ -849,14 +876,14 @@ export default function Materias() {
             // Actualizar estado local después del guardado exitoso
             setNotas(prev => {
                 const nuevasNotas = { ...prev };
-                
+
                 if (!nuevasNotas[selectedMateria.id]) nuevasNotas[selectedMateria.id] = {};
                 if (!nuevasNotas[selectedMateria.id][estudianteId]) nuevasNotas[selectedMateria.id][estudianteId] = {};
                 if (!nuevasNotas[selectedMateria.id][estudianteId][periodoKey]) nuevasNotas[selectedMateria.id][estudianteId][periodoKey] = [];
 
                 // Buscar si ya existe la nota en el estado local
                 const notaExistenteLocal = nuevasNotas[selectedMateria.id][estudianteId][periodoKey].find(n => n.tipoId === tipoNotaId);
-                
+
                 if (notaExistenteLocal) {
                     // Actualizar nota existente
                     notaExistenteLocal.valor = nota;
@@ -875,18 +902,18 @@ export default function Materias() {
                     nuevasNotas[selectedMateria.id][estudianteId][periodoKey].push(nuevaNota);
                     console.log('📝 Nueva nota creada en estado local:', nuevaNota);
                 }
-                
+
                 return nuevasNotas;
             });
 
             // Mostrar mensaje de éxito específico
-            const mensaje = esActualizacion 
+            const mensaje = esActualizacion
                 ? `✅ ${tipoNota.titulo} = ${nota} actualizado`
                 : `✅ ${tipoNota.titulo} = ${nota} creado`;
-            
+
             mostrarEstadoGuardado(mensaje);
             console.log(`✅ Operación completada: ${mensaje}`);
-            
+
         } catch (error) {
             console.error('❌ Error procesando nota:', error);
             mostrarEstadoGuardado(`❌ Error al procesar: ${error.message}`);
@@ -895,7 +922,7 @@ export default function Materias() {
 
     const borrarNotaIndividual = async (estudianteId, tipoNotaId) => {
         console.log('🗑️ Eliminando nota:', { estudianteId, tipoNotaId, materia: selectedMateria?.id, periodo: selectedPeriodo });
-        
+
         try {
             // Validaciones básicas
             if (!selectedMateria?.id || !estudianteId || !tipoNotaId) {
@@ -907,7 +934,7 @@ export default function Materias() {
             const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || [];
             const tiposExistentes = obtenerTiposNotaExistentes();
             const tipoNota = [...tiposManuales, ...tiposExistentes].find(t => t.id === tipoNotaId);
-            
+
             if (!tipoNota) {
                 console.log('⚠️ Tipo de nota no encontrado para eliminar');
                 mostrarEstadoGuardado('⚠️ Tipo de nota no encontrado');
@@ -916,11 +943,11 @@ export default function Materias() {
 
             const periodoKey = `periodo${selectedPeriodo}`;
             const notaExistente = notas[selectedMateria.id]?.[estudianteId]?.[periodoKey]?.find(n => n.tipoId === tipoNotaId);
-            
-            console.log('🔍 Nota a eliminar:', { 
-                tipo: tipoNota.titulo, 
-                existe: !!notaExistente, 
-                id: notaExistente?.id 
+
+            console.log('🔍 Nota a eliminar:', {
+                tipo: tipoNota.titulo,
+                existe: !!notaExistente,
+                id: notaExistente?.id
             });
 
             // Eliminar de la base de datos
@@ -946,10 +973,10 @@ export default function Materias() {
                 if (nuevasNotas[selectedMateria.id]?.[estudianteId]?.[periodoKey]) {
                     const notasAntes = nuevasNotas[selectedMateria.id][estudianteId][periodoKey].length;
                     // Filtrar la nota específica
-                    nuevasNotas[selectedMateria.id][estudianteId][periodoKey] = 
+                    nuevasNotas[selectedMateria.id][estudianteId][periodoKey] =
                         nuevasNotas[selectedMateria.id][estudianteId][periodoKey].filter(n => n.tipoId !== tipoNotaId);
                     const notasDespues = nuevasNotas[selectedMateria.id][estudianteId][periodoKey].length;
-                    
+
                     console.log(`📊 Estado local actualizado: ${notasAntes} → ${notasDespues} notas`);
                 } else {
                     console.log('📊 No había notas para este estudiante/período');
@@ -961,7 +988,7 @@ export default function Materias() {
             // Mostrar confirmación
             mostrarEstadoGuardado(`✅ Eliminado: ${tipoNota.titulo}`);
             console.log(`✅ Nota eliminada exitosamente: ${tipoNota.titulo}`);
-            
+
         } catch (error) {
             console.error('❌ Error eliminando nota:', error);
             mostrarEstadoGuardado(`❌ Error al eliminar: ${error.message}`);
@@ -976,12 +1003,6 @@ export default function Materias() {
         const periodoKey = `periodo${selectedPeriodo}`
         const notasPeriodo = notas[selectedMateria.id][estudianteId][periodoKey] || []
         const nota = notasPeriodo.find(n => n.tipoId === tipoNotaId)
-
-        // Debug: mostrar información detallada
-        console.log(`🔍 Buscando nota para estudiante ${estudianteId}, tipo ${tipoNotaId}:`)
-        console.log(`📊 Notas del período ${periodoKey}:`, notasPeriodo)
-        console.log(`🎯 Nota encontrada:`, nota)
-        console.log(`📝 Estado notas:`, notas[selectedMateria.id])
 
         return nota ? nota.valor : ''
     }
@@ -1024,13 +1045,13 @@ export default function Materias() {
 
     const eliminarTipoNota = async (tipoNotaId) => {
         console.log('🗑️ Eliminando tipo de nota:', { tipoNotaId, materia: selectedMateria?.id, periodo: selectedPeriodo });
-        
+
         try {
             // Buscar el tipo de nota para obtener su información
             const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || [];
             const tiposExistentes = obtenerTiposNotaExistentes();
             const tipoNota = [...tiposManuales, ...tiposExistentes].find(t => t.id === tipoNotaId);
-            
+
             if (!tipoNota) {
                 mostrarEstadoGuardado('❌ Error: Tipo de nota no encontrado');
                 return;
@@ -1038,7 +1059,7 @@ export default function Materias() {
 
             // Confirmar eliminación
             const confirmar = confirm(`¿Estás seguro de que quieres eliminar la columna "${tipoNota.titulo}"?\n\nEsto eliminará TODAS las notas de este tipo para todos los estudiantes en el período ${selectedPeriodo}.`);
-            
+
             if (!confirmar) {
                 console.log('❌ Eliminación cancelada por el usuario');
                 return;
@@ -1093,7 +1114,7 @@ export default function Materias() {
             // 4. Mostrar confirmación
             mostrarEstadoGuardado(`✅ Columna "${tipoNota.titulo}" eliminada (${notasEliminadas} notas)`);
             console.log(`✅ Tipo de nota eliminado: ${tipoNota.titulo}`);
-            
+
         } catch (error) {
             console.error('❌ Error eliminando tipo de nota:', error);
             mostrarEstadoGuardado(`❌ Error al eliminar columna: ${error.message}`);
@@ -1149,10 +1170,17 @@ export default function Materias() {
     }
 
     const exportarNotasExcel = async () => {
+        console.log('📊 Iniciando exportación de notas a Excel...')
+
         if (!selectedMateria) {
             alert('Selecciona una materia primero')
             return
         }
+
+        console.log('📚 Materia seleccionada:', selectedMateria.nombre)
+        console.log('📅 Período seleccionado:', selectedPeriodo)
+        console.log('👥 Total de estudiantes:', estudiantes.length)
+        console.log('📝 Estado de notas:', notas[selectedMateria.id])
 
         const wb = XLSX.utils.book_new()
 
@@ -1168,48 +1196,96 @@ export default function Materias() {
         datosHoja.push([]) // Fila vacía
 
         // Obtener todas las actividades del período seleccionado
-        const tiposActividad = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
+        // IMPORTANTE: Usar obtenerTiposNotaExistentes() que lee de las notas reales en BD
+        const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
+        const tiposExistentes = obtenerTiposNotaExistentes()
+
+        // Combinar tipos manuales y existentes evitando duplicados
+        const tiposCombinados = new Map()
+        tiposManuales.forEach(tipo => tiposCombinados.set(tipo.id, tipo))
+        tiposExistentes.forEach(tipo => {
+            if (!tiposCombinados.has(tipo.id)) {
+                tiposCombinados.set(tipo.id, tipo)
+            }
+        })
+
+        const tiposActividad = Array.from(tiposCombinados.values())
         const nombresPeriodos = Object.values(periodosAcademicos).map(p => `${p.nombre} (${p.descripcion})`)
+
+        console.log('📋 Tipos manuales:', tiposManuales.length, tiposManuales)
+        console.log('📋 Tipos existentes:', tiposExistentes.length, tiposExistentes)
+        console.log('📋 Tipos de actividad COMBINADOS:', tiposActividad.length)
+        console.log('📋 Actividades finales:', tiposActividad)
 
         if (tiposActividad.length > 0) {
             // Encabezados para actividades específicas
             const encabezados = ['Estudiante']
 
             // Agregar cada actividad como columna individual
-            tiposActividad.forEach(tipo => {
-                encabezados.push(tipo.titulo)
+            tiposActividad.forEach((tipo, index) => {
+                const titulo = tipo.titulo || tipo.descripcion || `Actividad ${index + 1}`
+                console.log(`  📝 Columna ${index + 1}: "${titulo}" (ID: ${tipo.id})`)
+                encabezados.push(titulo)
             })
 
-            // Agregar columna de actividades combinadas
-            const nombresActividades = tiposActividad.map(t => t.titulo).join(' | ')
+            // Agregar columna de promedio
             encabezados.push(`Promedio`)
 
             datosHoja.push(encabezados)
+            console.log('📋 Encabezados completos:', encabezados)
+            console.log('📋 Total de columnas:', encabezados.length)
 
             // Datos de estudiantes
-            estudiantes.forEach(estudiante => {
+            console.log('🔄 Procesando estudiantes...')
+            let estudiantesExportados = 0
+
+            estudiantes.forEach((estudiante, index) => {
                 const fila = [estudiante.nombre]
 
+                console.log(`👤 Estudiante ${index + 1}/${estudiantes.length}: ${estudiante.nombre} (ID: ${estudiante.id})`)
+
+                // Verificar si el estudiante tiene notas para esta materia
+                const tieneNotas = notas[selectedMateria.id]?.[estudiante.id]
+                console.log(`  🔍 Tiene notas en estado:`, !!tieneNotas)
+                if (tieneNotas) {
+                    console.log(`  📚 Períodos disponibles:`, Object.keys(tieneNotas))
+                }
+
                 // Agregar nota de cada actividad
-                tiposActividad.forEach(tipo => {
+                tiposActividad.forEach((tipo, tipoIndex) => {
                     const nota = obtenerNotaPorTipo(estudiante.id, tipo.id)
+                    const titulo = tipo.titulo || tipo.descripcion || `Actividad ${tipoIndex + 1}`
+                    console.log(`  📝 ${titulo} (ID: ${tipo.id}): ${nota || 'sin nota'}`)
                     fila.push(nota || '')
                 })
 
                 // Promedio del período
-                fila.push(calcularPromedioPeriodo(estudiante.id, selectedPeriodo))
+                const promedio = calcularPromedioPeriodo(estudiante.id, selectedPeriodo)
+                console.log(`  📊 Promedio período ${selectedPeriodo}: ${promedio}`)
+                fila.push(promedio || 0)
 
                 datosHoja.push(fila)
+                estudiantesExportados++
+                console.log(`  ✅ Fila con ${fila.length} columnas agregada (total filas: ${datosHoja.length})`)
             })
+
+            console.log(`✅ Total de estudiantes exportados: ${estudiantesExportados}`)
         } else {
+            console.log('⚠️ No hay actividades específicas, exportando promedios por período')
             // Si no hay actividades, mostrar solo promedios por período
             const encabezados = ['Estudiante',
                 ...Object.values(periodosAcademicos).map(p => `${p.nombre} (${p.descripcion})`),
                 'Promedio General'
             ]
             datosHoja.push(encabezados)
+            console.log('📋 Encabezados:', encabezados)
 
-            estudiantes.forEach(estudiante => {
+            console.log('🔄 Procesando estudiantes...')
+            let estudiantesExportados = 0
+
+            estudiantes.forEach((estudiante, index) => {
+                console.log(`👤 Estudiante ${index + 1}/${estudiantes.length}: ${estudiante.nombre} (ID: ${estudiante.id})`)
+
                 const fila = [
                     estudiante.nombre,
                     calcularPromedioPeriodo(estudiante.id, 1),
@@ -1218,9 +1294,22 @@ export default function Materias() {
                     calcularPromedioPeriodo(estudiante.id, 4),
                     calcularPromedio(estudiante.id)
                 ]
+
+                console.log(`  📊 Promedios: P1=${fila[1]}, P2=${fila[2]}, P3=${fila[3]}, P4=${fila[4]}, General=${fila[5]}`)
+
                 datosHoja.push(fila)
+                estudiantesExportados++
+                console.log(`  ✅ Fila agregada (total filas: ${datosHoja.length})`)
             })
+
+            console.log(`✅ Total de estudiantes exportados: ${estudiantesExportados}`)
         }
+
+        console.log('📊 Total de filas en la hoja:', datosHoja.length)
+        console.log('📋 Contenido completo de datosHoja:')
+        datosHoja.forEach((fila, index) => {
+            console.log(`  Fila ${index}:`, fila)
+        })
 
         const ws = XLSX.utils.aoa_to_sheet(datosHoja)
 
@@ -1236,9 +1325,23 @@ export default function Materias() {
         ws['!cols'] = colWidths
 
         XLSX.utils.book_append_sheet(wb, ws, 'Notas')
-        XLSX.writeFile(wb, `Notas_${selectedMateria.nombre}_${nombresPeriodos[selectedPeriodo - 1]}.xlsx`)
 
-        console.log('Excel exportado correctamente')
+        const nombreArchivo = `Notas_${selectedMateria.nombre}_${nombresPeriodos[selectedPeriodo - 1]}.xlsx`
+        XLSX.writeFile(wb, nombreArchivo)
+
+        console.log('✅ Excel exportado correctamente')
+        console.log(`📁 Nombre del archivo: ${nombreArchivo}`)
+
+        const totalEstudiantes = estudiantes.length
+        const filasExportadas = datosHoja.length - 7 // Restar encabezados institucionales (6) + encabezado de tabla (1)
+
+        alert(`✅ ¡Exportación completada!\n\n` +
+              `📚 Materia: ${selectedMateria.nombre}\n` +
+              `📅 Período: ${nombresPeriodos[selectedPeriodo - 1]}\n` +
+              `👥 Total estudiantes: ${totalEstudiantes}\n` +
+              `📊 Filas exportadas: ${filasExportadas}\n` +
+              `📋 Actividades: ${tiposActividad.length}\n\n` +
+              `Archivo: ${nombreArchivo}`)
     }
 
     // Vista de notas de una materia específica
@@ -1353,10 +1456,10 @@ export default function Materias() {
                                 {/* Indicador de auto-guardado */}
                                 {autoSaveStatus && (
                                     <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${
-                                        autoSaveStatus.includes('✅') 
-                                            ? 'bg-green-100 text-green-800 border-green-200' 
-                                            : autoSaveStatus.includes('❌') 
-                                                ? 'bg-red-100 text-red-800 border-red-200' 
+                                        autoSaveStatus.includes('✅')
+                                            ? 'bg-green-100 text-green-800 border-green-200'
+                                            : autoSaveStatus.includes('❌')
+                                                ? 'bg-red-100 text-red-800 border-red-200'
                                                 : 'bg-blue-100 text-blue-800 border-blue-200'
                                     }`}>
                                         <div className="flex items-center gap-2">
@@ -1488,13 +1591,13 @@ export default function Materias() {
                                     </div>
                                 </div>
                             )}
-                            
+
                             {/* Mensaje cuando no hay columnas de notas */}
                             {(() => {
                                 const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
                                 const tiposExistentes = obtenerTiposNotaExistentes()
                                 const tieneNotas = tiposManuales.length > 0 || tiposExistentes.length > 0
-                                
+
                                 if (!tieneNotas) {
                                     return (
                                         <div className="bg-yellow-50 border-b border-yellow-200 p-3">
@@ -1518,7 +1621,7 @@ export default function Materias() {
                                 }
                                 return null
                             })()}
-                            
+
                             <div className="overflow-auto max-h-[600px]">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
@@ -1534,22 +1637,22 @@ export default function Materias() {
                                                 // Combinar tipos de nota creados manualmente con tipos de nota existentes en las notas
                                                 const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
                                                 const tiposExistentes = obtenerTiposNotaExistentes()
-                                                
+
                                                 // Crear un mapa para evitar duplicados
                                                 const tiposCombinados = new Map()
-                                                
+
                                                 // Agregar tipos manuales primero
                                                 tiposManuales.forEach(tipo => {
                                                     tiposCombinados.set(tipo.id, tipo)
                                                 })
-                                                
+
                                                 // Agregar tipos existentes que no estén en los manuales
                                                 tiposExistentes.forEach(tipo => {
                                                     if (!tiposCombinados.has(tipo.id)) {
                                                         tiposCombinados.set(tipo.id, tipo)
                                                     }
                                                 })
-                                                
+
                                                 return Array.from(tiposCombinados.values()).map((tipo) => (
                                                     <th key={tipo.id} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                         <div className="flex items-center justify-center gap-1">
@@ -1591,7 +1694,7 @@ export default function Materias() {
                                                         // Usar la misma lógica para obtener tipos combinados
                                                         const tiposManuales = tiposNotaPeriodo[selectedMateria.id]?.[selectedPeriodo] || []
                                                         const tiposExistentes = obtenerTiposNotaExistentes()
-                                                        
+
                                                         const tiposCombinados = new Map()
                                                         tiposManuales.forEach(tipo => tiposCombinados.set(tipo.id, tipo))
                                                         tiposExistentes.forEach(tipo => {
@@ -1599,12 +1702,12 @@ export default function Materias() {
                                                                 tiposCombinados.set(tipo.id, tipo)
                                                             }
                                                         })
-                                                        
+
                                                         return Array.from(tiposCombinados.values()).map((tipo) => {
                                                             const notaActual = obtenerNotaPorTipo(estudiante.id, tipo.id)
                                                             const claveTemporal = `${estudiante.id}-${tipo.id}`
                                                             const valorTemporal = valoresTemporales[claveTemporal] !== undefined ? valoresTemporales[claveTemporal] : notaActual
-                                                            
+
                                                             return (
                                                                 <td key={tipo.id} className="px-3 py-4 whitespace-nowrap text-center">
                                                                     <input
@@ -1613,7 +1716,7 @@ export default function Materias() {
                                                                         onChange={(e) => {
                                                                             const valor = e.target.value;
                                                                             console.log('🔄 Cambio detectado:', valor, 'para estudiante', estudiante.id, 'tipo', tipo.id);
-                                                                            
+
                                                                             // Actualizar valor temporal
                                                                             setValoresTemporales(prev => ({
                                                                                 ...prev,
@@ -1624,19 +1727,19 @@ export default function Materias() {
                                                                             console.log('👁️ Input perdió foco');
                                                                             const valor = e.target.value;
                                                                             const input = e.target;
-                                                                            
+
                                                                             // Limpiar valor temporal
                                                                             setValoresTemporales(prev => {
                                                                                 const nuevos = { ...prev }
                                                                                 delete nuevos[claveTemporal]
                                                                                 return nuevos
                                                                             })
-                                                                            
+
                                                                             // Validar y guardar
                                                                             if (valor !== '') {
                                                                                 const valorLimpio = valor.replace(',', '.');
                                                                                 const nota = parseFloat(valorLimpio);
-                                                                                
+
                                                                                 if (isNaN(nota) || nota < 1.0 || nota > 5.0) {
                                                                                     // Mostrar error y limpiar
                                                                                     mostrarEstadoGuardado('❌ Nota inválida. Debe estar entre 1.0 y 5.0');
@@ -1648,15 +1751,15 @@ export default function Materias() {
                                                                                     }, 2000);
                                                                                     return;
                                                                                 }
-                                                                                
+
                                                                                 // Mostrar indicador de guardado
                                                                                 input.style.backgroundColor = '#fef3c7'; // amarillo claro
                                                                                 input.style.borderColor = '#f59e0b';
-                                                                                
+
                                                                                 try {
                                                                                     // Guardar nota válida
                                                                                     await agregarNotaIndividual(estudiante.id, tipo.id, valor);
-                                                                                    
+
                                                                                     // Mostrar feedback de éxito
                                                                                     input.style.backgroundColor = '#dcfce7'; // verde claro
                                                                                     input.style.borderColor = '#22c55e';
@@ -1677,7 +1780,7 @@ export default function Materias() {
                                                                                 // Borrar nota si está vacía
                                                                                 try {
                                                                                     await borrarNotaIndividual(estudiante.id, tipo.id);
-                                                                                    
+
                                                                                     // Mostrar feedback de eliminación
                                                                                     input.style.backgroundColor = '#f3f4f6'; // gris claro
                                                                                     input.style.borderColor = '#6b7280';
@@ -1704,20 +1807,20 @@ export default function Materias() {
                                                                                 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
                                                                                 'Home', 'End'
                                                                             ];
-                                                                            
+
                                                                             // Permitir números, punto y coma
-                                                                            if (allowedKeys.includes(e.key) || 
-                                                                                (e.key >= '0' && e.key <= '9') || 
-                                                                                e.key === '.' || 
+                                                                            if (allowedKeys.includes(e.key) ||
+                                                                                (e.key >= '0' && e.key <= '9') ||
+                                                                                e.key === '.' ||
                                                                                 e.key === ',') {
                                                                                 return;
                                                                             }
-                                                                            
+
                                                                             // Permitir Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
                                                                             if (e.ctrlKey && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) {
                                                                                 return;
                                                                             }
-                                                                            
+
                                                                             e.preventDefault();
                                                                         }}
                                                                         className="w-16 p-1 text-center border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -2116,10 +2219,10 @@ export default function Materias() {
                         {/* Indicador de estado */}
                         {autoSaveStatus && (
                             <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${
-                                autoSaveStatus.includes('✅') 
-                                    ? 'bg-green-100 text-green-800 border-green-200' 
-                                    : autoSaveStatus.includes('❌') 
-                                        ? 'bg-red-100 text-red-800 border-red-200' 
+                                autoSaveStatus.includes('✅')
+                                    ? 'bg-green-100 text-green-800 border-green-200'
+                                    : autoSaveStatus.includes('❌')
+                                        ? 'bg-red-100 text-red-800 border-red-200'
                                         : 'bg-blue-100 text-blue-800 border-blue-200'
                             }`}>
                                 <div className="flex items-center gap-2">
@@ -2210,7 +2313,7 @@ export default function Materias() {
                     </div>
                 </div>
 
-                
+
 
                 {/* Tabla de materias */}
                 <div className="p-4 md:p-6">

@@ -429,7 +429,10 @@ export default function Materias() {
             console.log('🔍 Estudiantes filtrados por usuario:', estudiantesUsuario.length);
 
             setMaterias(materiasUsuario)
-            setEstudiantes(estudiantesUsuario)
+            // Ordenar estudiantes alfabéticamente por nombre
+            setEstudiantes(estudiantesUsuario.sort((a, b) => {
+                return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
+            }))
 
             // Cargar tipos de nota persistidos y migrar si es necesario
             const tiposNotaMigrados = migrarTiposNota(tiposNotaGuardados, materiasUsuario)
@@ -731,6 +734,35 @@ export default function Materias() {
         return `${base}${siguienteNumero.toString().padStart(match[2]?.length || 1, '0')}`
     }
 
+    // Función para eliminar estudiante
+    const handleDeleteStudent = async (estudianteId) => {
+        const estudiante = estudiantes.find(est => est.id === estudianteId)
+        
+        if (!estudiante) {
+            mostrarEstadoGuardado('❌ Estudiante no encontrado')
+            return
+        }
+
+        const confirmar = confirm(`¿Estás seguro de que quieres eliminar a ${estudiante.nombre}?\n\nEsto eliminará todas sus asistencias y notas de la base de datos.`)
+        
+        if (!confirmar) {
+            return
+        }
+
+        try {
+            // Eliminar de la base de datos
+            await db.eliminarEstudiante(estudianteId)
+            
+            // Actualizar lista local
+            setEstudiantes(prev => prev.filter(est => est.id !== estudianteId))
+            
+            mostrarEstadoGuardado(`✅ ${estudiante.nombre} eliminado correctamente`)
+        } catch (error) {
+            console.error('❌ Error eliminando estudiante:', error)
+            mostrarEstadoGuardado(`❌ Error al eliminar: ${error.message}`)
+        }
+    }
+
     const handleAddStudent = async () => {
         if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) return
 
@@ -759,9 +791,7 @@ export default function Materias() {
             }
 
             setEstudiantes(prev => [...prev, estudianteTemporal].sort((a, b) => {
-                const codigoA = parseInt(a.codigo) || 0;
-                const codigoB = parseInt(b.codigo) || 0;
-                return codigoA - codigoB;
+                return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
             }))
             setStudentForm({ nombre: '', codigo: '' })
             setShowAddStudentModal(false)
@@ -1674,6 +1704,9 @@ export default function Materias() {
                                             <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 Estado
                                             </th>
+                                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Acciones
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1841,6 +1874,15 @@ export default function Materias() {
                                                             {promedioPeriodo >= 3.5 ? 'Aprobado' : promedioPeriodo >= 3.0 ? 'Suficiente' : 'Reprobado'}
                                                         </span>
                                                     </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                        <button
+                                                            onClick={() => handleDeleteStudent(estudiante.id)}
+                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Eliminar estudiante"
+                                                        >
+                                                            <TrashIcon className="w-5 h-5" />
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                             )
                                         })}
@@ -1938,6 +1980,9 @@ export default function Materias() {
                                             <th className="px-3 py-3 text-center text-xs font-medium text-green-600 uppercase tracking-wider">
                                                 Notas Registradas
                                             </th>
+                                            <th className="px-3 py-3 text-center text-xs font-medium text-green-600 uppercase tracking-wider">
+                                                Acciones
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1999,6 +2044,15 @@ export default function Materias() {
                                                         <div className="text-xs text-gray-500 mt-1">
                                                             {notasPeriodo.length} nota{notasPeriodo.length !== 1 ? 's' : ''}
                                                         </div>
+                                                    </td>
+                                                    <td className="px-3 py-4 whitespace-nowrap text-center">
+                                                        <button
+                                                            onClick={() => handleDeleteStudent(estudiante.id)}
+                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Eliminar estudiante"
+                                                        >
+                                                            <TrashIcon className="w-5 h-5" />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             )

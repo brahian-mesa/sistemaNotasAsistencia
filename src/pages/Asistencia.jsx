@@ -140,6 +140,35 @@ export default function Asistencia() {
         return `${base}${siguienteNumero.toString().padStart(match[2]?.length || 1, '0')}`
     }
 
+    // Función para eliminar estudiante
+    const handleDeleteStudent = async (estudianteId) => {
+        const estudiante = estudiantes.find(est => est.id === estudianteId)
+        
+        if (!estudiante) {
+            mostrarEstadoGuardado('❌ Estudiante no encontrado')
+            return
+        }
+
+        const confirmar = confirm(`¿Estás seguro de que quieres eliminar a ${estudiante.nombre}?\n\nEsto eliminará todas sus asistencias y notas de la base de datos.`)
+        
+        if (!confirmar) {
+            return
+        }
+
+        try {
+            // Eliminar de la base de datos
+            await db.eliminarEstudiante(estudianteId)
+            
+            // Actualizar lista local
+            setEstudiantes(prev => prev.filter(est => est.id !== estudianteId))
+            
+            mostrarEstadoGuardado(`✅ ${estudiante.nombre} eliminado correctamente`)
+        } catch (error) {
+            console.error('❌ Error eliminando estudiante:', error)
+            mostrarEstadoGuardado(`❌ Error al eliminar: ${error.message}`)
+        }
+    }
+
     // Función para agregar estudiante (igual que en Materias)
     const handleAddStudent = async () => {
         if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) {
@@ -166,11 +195,9 @@ export default function Asistencia() {
 
             const estudianteGuardado = await db.guardarEstudiante(nuevoEstudiante)
 
-            // Actualizar lista local
+            // Actualizar lista local - ordenar alfabéticamente por nombre
             setEstudiantes(prev => [...prev, estudianteGuardado].sort((a, b) => {
-                const codigoA = parseInt(a.codigo) || 0;
-                const codigoB = parseInt(b.codigo) || 0;
-                return codigoA - codigoB;
+                return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
             }))
             setStudentForm({ nombre: '', codigo: '' })
             setShowAddStudentModal(false)
@@ -220,11 +247,9 @@ export default function Asistencia() {
             const estudiantesUsuario = estudiantesDB || []
 
             setMaterias(materiasUsuario)
-            // Ordenar estudiantes por código automáticamente
+            // Ordenar estudiantes alfabéticamente por nombre
             setEstudiantes(estudiantesUsuario.sort((a, b) => {
-                const codigoA = parseInt(a.codigo) || 0;
-                const codigoB = parseInt(b.codigo) || 0;
-                return codigoA - codigoB;
+                return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
             }))
 
 
@@ -1012,6 +1037,7 @@ export default function Asistencia() {
                                         <th className="border border-purple-200 p-3 text-left text-purple-800 font-bold">Código</th>
                                         <th className="border border-purple-200 p-3 text-left text-purple-800 font-bold">Estudiante</th>
                                         <th className="border border-purple-200 p-3 text-center text-purple-800 font-bold">Asistencia</th>
+                                        <th className="border border-purple-200 p-3 text-center text-purple-800 font-bold">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1067,6 +1093,19 @@ export default function Asistencia() {
                                                                 </div>
                                                             )}
                                                         </label>
+                                                    </div>
+                                                </td>
+                                                <td className="border border-purple-200 p-3">
+                                                    <div className="flex justify-center">
+                                                        <button
+                                                            onClick={() => handleDeleteStudent(estudiante.id)}
+                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Eliminar estudiante"
+                                                        >
+                                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            </svg>
+                                                        </button>
                                                     </div>
                                                 </td>
                                             </tr>

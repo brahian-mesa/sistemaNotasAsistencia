@@ -142,14 +142,14 @@ export default function Asistencia() {
     // Función para eliminar estudiante
     const handleDeleteStudent = async (estudianteId) => {
         const estudiante = estudiantes.find(est => est.id === estudianteId)
-        
+
         if (!estudiante) {
             mostrarEstadoGuardado('❌ Estudiante no encontrado')
             return
         }
 
         const confirmar = confirm(`¿Estás seguro de que quieres eliminar a ${estudiante.nombre}?\n\nEsto eliminará todas sus asistencias y notas de la base de datos.`)
-        
+
         if (!confirmar) {
             return
         }
@@ -157,10 +157,10 @@ export default function Asistencia() {
         try {
             // Eliminar de la base de datos
             await db.eliminarEstudiante(estudianteId)
-            
+
             // Actualizar lista local
             setEstudiantes(prev => prev.filter(est => est.id !== estudianteId))
-            
+
             mostrarEstadoGuardado(`✅ ${estudiante.nombre} eliminado correctamente`)
         } catch (error) {
             console.error('❌ Error eliminando estudiante:', error)

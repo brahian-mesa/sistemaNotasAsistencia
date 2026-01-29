@@ -414,6 +414,13 @@ export default function Sidebar() {
                             Calendario Escolar
                         </button>
                     </Link>
+
+                    <Link to="/configuracion">
+                        <button className={getButtonClass("/configuracion")}>
+                            <CalendarIcon className="w-6 h-6 mr-4" />
+                            Actualizar Fechas
+                        </button>
+                    </Link>
                 </div>
 
                 {/* Settings Button */}

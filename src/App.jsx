@@ -22,6 +22,7 @@ const Materias = lazy(() => import('./pages/Materias'))
 const Asistencia = lazy(() => import('./pages/Asistencia'))
 const NotasDocente = lazy(() => import('./pages/NotasDocente'))
 const NotasPersonales = lazy(() => import('./pages/Notaspersonales'))
+const Configuracion = lazy(() => import('./pages/Configuracion'))
 const YearConfiguration = lazy(() => import('./components/YearConfiguration'))
 const DatabaseRelationshipTest = lazy(() => import('./components/DatabaseRelationshipTest'))
 // const SupabaseTestPage = lazy(() => import('./pages/SupabaseTestPage'))
@@ -248,6 +249,14 @@ function AppRoutes() {
             <FileNotification />
             <DashboardLayout>
               <NotasPersonales />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/configuracion" element={
+          <ProtectedRoute>
+            <FileNotification />
+            <DashboardLayout>
+              <Configuracion />
             </DashboardLayout>
           </ProtectedRoute>
         } />

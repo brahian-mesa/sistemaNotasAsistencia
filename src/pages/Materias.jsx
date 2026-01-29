@@ -736,14 +736,14 @@ export default function Materias() {
     // Función para eliminar estudiante
     const handleDeleteStudent = async (estudianteId) => {
         const estudiante = estudiantes.find(est => est.id === estudianteId)
-        
+
         if (!estudiante) {
             mostrarEstadoGuardado('❌ Estudiante no encontrado')
             return
         }
 
         const confirmar = confirm(`¿Estás seguro de que quieres eliminar a ${estudiante.nombre}?\n\nEsto eliminará todas sus asistencias y notas de la base de datos.`)
-        
+
         if (!confirmar) {
             return
         }
@@ -751,10 +751,10 @@ export default function Materias() {
         try {
             // Eliminar de la base de datos
             await db.eliminarEstudiante(estudianteId)
-            
+
             // Actualizar lista local
             setEstudiantes(prev => prev.filter(est => est.id !== estudianteId))
-            
+
             mostrarEstadoGuardado(`✅ ${estudiante.nombre} eliminado correctamente`)
         } catch (error) {
             console.error('❌ Error eliminando estudiante:', error)
@@ -1375,12 +1375,12 @@ export default function Materias() {
         const filasExportadas = datosHoja.length - 7 // Restar encabezados institucionales (6) + encabezado de tabla (1)
 
         alert(`✅ ¡Exportación completada!\n\n` +
-              `📚 Materia: ${selectedMateria.nombre}\n` +
-              `📅 Período: ${nombresPeriodos[selectedPeriodo - 1]}\n` +
-              `👥 Total estudiantes: ${totalEstudiantes}\n` +
-              `📊 Filas exportadas: ${filasExportadas}\n` +
-              `📋 Actividades: ${tiposActividad.length}\n\n` +
-              `Archivo: ${nombreArchivo}`)
+            `📚 Materia: ${selectedMateria.nombre}\n` +
+            `📅 Período: ${nombresPeriodos[selectedPeriodo - 1]}\n` +
+            `👥 Total estudiantes: ${totalEstudiantes}\n` +
+            `📊 Filas exportadas: ${filasExportadas}\n` +
+            `📋 Actividades: ${tiposActividad.length}\n\n` +
+            `Archivo: ${nombreArchivo}`)
     }
 
     // Vista de notas de una materia específica
@@ -1494,13 +1494,12 @@ export default function Materias() {
                             <div className="flex flex-wrap gap-2">
                                 {/* Indicador de auto-guardado */}
                                 {autoSaveStatus && (
-                                    <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${
-                                        autoSaveStatus.includes('✅')
+                                    <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${autoSaveStatus.includes('✅')
                                             ? 'bg-green-100 text-green-800 border-green-200'
                                             : autoSaveStatus.includes('❌')
                                                 ? 'bg-red-100 text-red-800 border-red-200'
                                                 : 'bg-blue-100 text-blue-800 border-blue-200'
-                                    }`}>
+                                        }`}>
                                         <div className="flex items-center gap-2">
                                             {autoSaveStatus.includes('✅') && <span>✅</span>}
                                             {autoSaveStatus.includes('❌') && <span>❌</span>}
@@ -2026,8 +2025,8 @@ export default function Materias() {
                                                     </td>
                                                     <td className="px-3 py-4 whitespace-nowrap text-center">
                                                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${promedioPeriodo >= 3.5 ? 'bg-green-100 text-green-800' :
-                                                                promedioPeriodo >= 3.0 ? 'bg-yellow-100 text-yellow-800' :
-                                                                    promedioPeriodo > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                                                            promedioPeriodo >= 3.0 ? 'bg-yellow-100 text-yellow-800' :
+                                                                promedioPeriodo > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
                                                             }`}>
                                                             {promedioPeriodo >= 3.5 ? '✅ Aprobado' :
                                                                 promedioPeriodo >= 3.0 ? '⚠️ Suficiente' :
@@ -2274,13 +2273,12 @@ export default function Materias() {
 
                         {/* Indicador de estado */}
                         {autoSaveStatus && (
-                            <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${
-                                autoSaveStatus.includes('✅')
+                            <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${autoSaveStatus.includes('✅')
                                     ? 'bg-green-100 text-green-800 border-green-200'
                                     : autoSaveStatus.includes('❌')
                                         ? 'bg-red-100 text-red-800 border-red-200'
                                         : 'bg-blue-100 text-blue-800 border-blue-200'
-                            }`}>
+                                }`}>
                                 <div className="flex items-center gap-2">
                                     {autoSaveStatus.includes('✅') && <span>✅</span>}
                                     {autoSaveStatus.includes('❌') && <span>❌</span>}

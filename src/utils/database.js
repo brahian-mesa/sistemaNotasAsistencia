@@ -48,7 +48,7 @@ class LocalDatabase {
         .limit(1000); // Limitar resultados para mejor rendimiento
 
       if (error) throw error;
-      
+
       // Ordenar numéricamente por código
       const estudiantes = data || [];
       return estudiantes.sort((a, b) => {
@@ -117,10 +117,10 @@ class LocalDatabase {
     try {
       // Eliminar asistencias del estudiante
       await supabase.from("asistencias").delete().eq("estudiante_id", id);
-      
+
       // Eliminar notas individuales del estudiante
       await supabase.from("notas_individuales").delete().eq("estudiante_id", id);
-      
+
       // Finalmente, eliminar el estudiante
       const { error } = await supabase
         .from("estudiantes")
@@ -416,21 +416,27 @@ class LocalDatabase {
   // ===== PERÍODOS ACADÉMICOS =====
   async getPeriodosAcademicos() {
     try {
+      const user = await this.getCurrentUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
       const { data, error } = await supabase
         .from("periodos")
         .select("*")
-        .order("id");
+        .eq("usuario_id", user.id)
+        .order("numero");
 
       if (error) throw error;
 
       // Convertir a formato esperado
       const periodos = {};
-      data.forEach((periodo) => {
-        periodos[periodo.numero] = {
-          fechaInicio: periodo.fecha_inicio,
-          fechaFin: periodo.fecha_fin,
-        };
-      });
+      if (data && data.length > 0) {
+        data.forEach((periodo) => {
+          periodos[periodo.numero] = {
+            fechaInicio: periodo.fecha_inicio,
+            fechaFin: periodo.fecha_fin,
+          };
+        });
+      }
 
       return periodos;
     } catch (error) {
@@ -447,9 +453,13 @@ class LocalDatabase {
 
   async guardarPeriodosAcademicos(periodos) {
     try {
+      const user = await this.getCurrentUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
       const periodosArray = Object.entries(periodos)
         .filter(([numero, datos]) => datos.fechaInicio && datos.fechaFin) // Solo guardar períodos completos
         .map(([numero, datos]) => ({
+          usuario_id: user.id,
           numero: parseInt(numero),
           nombre: `Período ${numero}`,
           fecha_inicio: datos.fechaInicio,
@@ -463,9 +473,16 @@ class LocalDatabase {
         return;
       }
 
+      // Primero eliminar periodos existentes del usuario
+      await supabase
+        .from("periodos")
+        .delete()
+        .eq("usuario_id", user.id);
+
+      // Insertar los nuevos periodos
       const { error } = await supabase
         .from("periodos")
-        .upsert(periodosArray, { onConflict: "numero" });
+        .insert(periodosArray);
 
       if (error) throw error;
       console.log(
@@ -628,7 +645,7 @@ class LocalDatabase {
   async actualizarNotaIndividual(notaId, nuevoValor) {
     try {
       const currentUser = this.getCurrentUser();
-      
+
       console.log("🔄 Actualizando nota individual:", {
         notaId,
         nuevoValor,
@@ -637,7 +654,7 @@ class LocalDatabase {
 
       const { error, data } = await supabase
         .from("notas_individuales")
-        .update({ 
+        .update({
           valor: nuevoValor,
           updated_at: new Date().toISOString()
         })
@@ -657,7 +674,7 @@ class LocalDatabase {
   async eliminarNotaIndividualPorId(notaId) {
     try {
       const currentUser = this.getCurrentUser();
-      
+
       console.log("🗑️ Eliminando nota individual por ID:", {
         notaId,
         usuarioId: currentUser?.id
@@ -680,7 +697,7 @@ class LocalDatabase {
   async eliminarNotaIndividual(materiaId, estudianteId, periodo, tipoNotaId) {
     try {
       const currentUser = this.getCurrentUser();
-      
+
       console.log("🗑️ Eliminando nota individual:", {
         materiaId,
         estudianteId,
@@ -764,7 +781,7 @@ class LocalDatabase {
           .single();
 
         console.log("💾 Respuesta de actualización:", { data, error });
-        
+
         if (error) {
           console.error("❌ Error actualizando notas personales:", error);
           throw error;
@@ -785,7 +802,7 @@ class LocalDatabase {
           .single();
 
         console.log("💾 Respuesta de inserción:", { data, error });
-        
+
         if (error) {
           console.error("❌ Error insertando notas personales:", error);
           throw error;
@@ -857,7 +874,7 @@ class LocalDatabase {
           .single();
 
         console.log("💾 Respuesta de actualización:", { data, error });
-        
+
         if (error) {
           console.error("❌ Error actualizando calendario PDF:", error);
           throw error;
@@ -879,7 +896,7 @@ class LocalDatabase {
           .single();
 
         console.log("💾 Respuesta de inserción:", { data, error });
-        
+
         if (error) {
           console.error("❌ Error insertando calendario PDF:", error);
           throw error;

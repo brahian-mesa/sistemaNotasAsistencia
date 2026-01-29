@@ -416,7 +416,7 @@ class LocalDatabase {
   // ===== PERÍODOS ACADÉMICOS =====
   async getPeriodosAcademicos() {
     try {
-      const user = await this.getCurrentUser();
+      const user = this.getCurrentUser();
       if (!user) throw new Error("Usuario no autenticado");
 
       const { data, error } = await supabase
@@ -453,11 +453,15 @@ class LocalDatabase {
 
   async guardarPeriodosAcademicos(periodos) {
     try {
-      const user = await this.getCurrentUser();
+      console.log("🔍 Iniciando guardarPeriodosAcademicos con:", periodos);
+      
+      const user = this.getCurrentUser();
+      console.log("👤 Usuario actual:", user);
+      
       if (!user) throw new Error("Usuario no autenticado");
 
       const periodosArray = Object.entries(periodos)
-        .filter(([numero, datos]) => datos.fechaInicio && datos.fechaFin) // Solo guardar períodos completos
+        .filter(([numero, datos]) => datos && datos.fechaInicio && datos.fechaFin) // Solo guardar períodos completos
         .map(([numero, datos]) => ({
           usuario_id: user.id,
           numero: parseInt(numero),
@@ -468,25 +472,37 @@ class LocalDatabase {
           created_at: new Date().toISOString(),
         }));
 
+      console.log("📊 Períodos a guardar:", periodosArray);
+
       if (periodosArray.length === 0) {
         console.log("⚠️ No hay períodos completos para guardar");
-        return;
+        throw new Error("No hay períodos completos para guardar");
       }
 
       // Primero eliminar periodos existentes del usuario
-      await supabase
+      console.log("🗑️ Eliminando períodos existentes del usuario:", user.id);
+      const deleteResult = await supabase
         .from("periodos")
         .delete()
         .eq("usuario_id", user.id);
+      
+      console.log("🗑️ Resultado de eliminación:", deleteResult);
 
       // Insertar los nuevos periodos
-      const { error } = await supabase
+      console.log("💾 Insertando nuevos períodos...");
+      const { data, error } = await supabase
         .from("periodos")
-        .insert(periodosArray);
+        .insert(periodosArray)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Error de Supabase al insertar:", error);
+        throw error;
+      }
+      
+      console.log("✅ Períodos guardados exitosamente:", data);
       console.log(
-        "✅ Períodos académicos guardados:",
+        "✅ Total períodos académicos guardados:",
         periodosArray.length,
         "períodos"
       );

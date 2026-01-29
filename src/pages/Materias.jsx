@@ -393,7 +393,7 @@ export default function Materias() {
     const cargarPeriodosAcademicos = async () => {
         try {
             const periodos = await db.getPeriodosAcademicos()
-            
+
             // Formatear periodos con información adicional
             const periodosFormateados = {}
             Object.keys(periodos).forEach(numero => {
@@ -407,7 +407,7 @@ export default function Materias() {
                     }
                 }
             })
-            
+
             if (Object.keys(periodosFormateados).length > 0) {
                 setPeriodosAcademicos(periodosFormateados)
                 console.log('✅ Períodos académicos cargados:', periodosFormateados)
@@ -1521,10 +1521,10 @@ export default function Materias() {
                                 {/* Indicador de auto-guardado */}
                                 {autoSaveStatus && (
                                     <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${autoSaveStatus.includes('✅')
-                                            ? 'bg-green-100 text-green-800 border-green-200'
-                                            : autoSaveStatus.includes('❌')
-                                                ? 'bg-red-100 text-red-800 border-red-200'
-                                                : 'bg-blue-100 text-blue-800 border-blue-200'
+                                        ? 'bg-green-100 text-green-800 border-green-200'
+                                        : autoSaveStatus.includes('❌')
+                                            ? 'bg-red-100 text-red-800 border-red-200'
+                                            : 'bg-blue-100 text-blue-800 border-blue-200'
                                         }`}>
                                         <div className="flex items-center gap-2">
                                             {autoSaveStatus.includes('✅') && <span>✅</span>}
@@ -2300,10 +2300,10 @@ export default function Materias() {
                         {/* Indicador de estado */}
                         {autoSaveStatus && (
                             <div className={`px-3 py-2 rounded-lg text-sm font-medium border animate-pulse ${autoSaveStatus.includes('✅')
-                                    ? 'bg-green-100 text-green-800 border-green-200'
-                                    : autoSaveStatus.includes('❌')
-                                        ? 'bg-red-100 text-red-800 border-red-200'
-                                        : 'bg-blue-100 text-blue-800 border-blue-200'
+                                ? 'bg-green-100 text-green-800 border-green-200'
+                                : autoSaveStatus.includes('❌')
+                                    ? 'bg-red-100 text-red-800 border-red-200'
+                                    : 'bg-blue-100 text-blue-800 border-blue-200'
                                 }`}>
                                 <div className="flex items-center gap-2">
                                     {autoSaveStatus.includes('✅') && <span>✅</span>}

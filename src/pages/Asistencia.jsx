@@ -223,7 +223,7 @@ export default function Asistencia() {
     const cargarPeriodosAcademicos = async () => {
         try {
             const periodos = await db.getPeriodosAcademicos()
-            
+
             // Formatear periodos con información adicional
             const periodosFormateados = {}
             Object.keys(periodos).forEach(numero => {
@@ -237,7 +237,7 @@ export default function Asistencia() {
                     }
                 }
             })
-            
+
             if (Object.keys(periodosFormateados).length > 0) {
                 setPeriodosAcademicos(periodosFormateados)
                 console.log('✅ Períodos académicos cargados:', periodosFormateados)

@@ -37,12 +37,20 @@ const Configuracion = () => {
         setLoading(true);
         try {
             const periodosData = await db.getPeriodosAcademicos();
+            console.log('📥 Períodos recibidos de BD:', periodosData);
+            
             if (periodosData && Object.keys(periodosData).length > 0) {
+                // Los períodos vienen como { 1: {fechaInicio, fechaFin}, 2: {...}, ... }
                 setPeriodosAcademicos(periodosData);
                 console.log('✅ Períodos cargados:', periodosData);
+            } else {
+                console.log('⚠️ No hay períodos guardados, usando valores por defecto');
+                // Mantener el estado inicial si no hay períodos
             }
         } catch (error) {
             console.error('❌ Error cargando períodos:', error);
+            setSaveMessage('❌ Error al cargar períodos: ' + error.message);
+            setTimeout(() => setSaveMessage(''), 3000);
         } finally {
             setLoading(false);
         }
@@ -51,28 +59,36 @@ const Configuracion = () => {
     const handleGuardarPeriodos = async () => {
         setSaving(true);
         try {
+            console.log('📅 Intentando guardar períodos:', periodosAcademicos);
+            
             // Validar que al menos un periodo tenga fechas
             const algunPeriodoCompleto = Object.values(periodosAcademicos).some(
-                periodo => periodo.fechaInicio && periodo.fechaFin
+                periodo => periodo && periodo.fechaInicio && periodo.fechaFin
             );
 
             if (!algunPeriodoCompleto) {
                 setSaveMessage('❌ Debes configurar al menos un período completo');
                 setTimeout(() => setSaveMessage(''), 3000);
+                setSaving(false);
                 return;
             }
 
-            console.log('📅 Guardando períodos académicos...');
+            console.log('📅 Guardando períodos académicos en la base de datos...');
             await db.guardarPeriodosAcademicos(periodosAcademicos);
 
             setSaveMessage('✅ Fechas de períodos actualizadas correctamente');
-            setTimeout(() => setSaveMessage(''), 3000);
-
             console.log('✅ Períodos académicos guardados exitosamente');
+            
+            // Recargar los periodos para confirmar
+            setTimeout(() => {
+                cargarPeriodos();
+            }, 500);
+            
+            setTimeout(() => setSaveMessage(''), 4000);
         } catch (error) {
             console.error('❌ Error guardando períodos:', error);
-            setSaveMessage('❌ Error al guardar los períodos. Intenta de nuevo.');
-            setTimeout(() => setSaveMessage(''), 3000);
+            setSaveMessage(`❌ Error: ${error.message || 'Error al guardar los períodos'}`);
+            setTimeout(() => setSaveMessage(''), 5000);
         } finally {
             setSaving(false);
         }

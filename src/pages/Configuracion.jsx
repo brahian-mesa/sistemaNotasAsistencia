@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
+import {
     CalendarIcon,
     CheckCircleIcon,
     ArrowPathIcon
@@ -64,10 +64,10 @@ const Configuracion = () => {
 
             console.log('📅 Guardando períodos académicos...');
             await db.guardarPeriodosAcademicos(periodosAcademicos);
-            
+
             setSaveMessage('✅ Fechas de períodos actualizadas correctamente');
             setTimeout(() => setSaveMessage(''), 3000);
-            
+
             console.log('✅ Períodos académicos guardados exitosamente');
         } catch (error) {
             console.error('❌ Error guardando períodos:', error);
@@ -119,8 +119,8 @@ const Configuracion = () => {
                 {/* Mensaje de guardado */}
                 {saveMessage && (
                     <div className={`mb-6 p-4 rounded-lg border ${
-                        saveMessage.includes('✅') 
-                            ? 'bg-green-50 border-green-200 text-green-800' 
+                        saveMessage.includes('✅')
+                            ? 'bg-green-50 border-green-200 text-green-800'
                             : 'bg-red-50 border-red-200 text-red-800'
                     }`}>
                         <p className="font-medium">{saveMessage}</p>
@@ -143,8 +143,8 @@ const Configuracion = () => {
                         {/* Grid de períodos */}
                         <div className="grid gap-6 md:grid-cols-2">
                             {[1, 2, 3, 4].map(periodo => (
-                                <div 
-                                    key={periodo} 
+                                <div
+                                    key={periodo}
                                     className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-5 border-2 border-gray-200 hover:border-purple-300 transition-all"
                                 >
                                     <div className="flex items-center gap-3 mb-4">
@@ -155,7 +155,7 @@ const Configuracion = () => {
                                             Período {periodo}
                                         </h3>
                                     </div>
-                                    
+
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -171,7 +171,7 @@ const Configuracion = () => {
                                                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                                             />
                                         </div>
-                                        
+
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                 📅 Fecha de Fin *
@@ -186,7 +186,7 @@ const Configuracion = () => {
                                                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                                             />
                                         </div>
-                                        
+
                                         {periodosAcademicos[periodo]?.fechaInicio && periodosAcademicos[periodo]?.fechaFin && (
                                             <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
                                                 <p className="text-sm text-purple-800 font-medium">
@@ -251,4 +251,3 @@ const Configuracion = () => {
 };
 
 export default Configuracion;
-

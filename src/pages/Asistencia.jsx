@@ -223,10 +223,36 @@ export default function Asistencia() {
     const cargarPeriodosAcademicos = async () => {
         try {
             const periodos = await db.getPeriodosAcademicos()
-            setPeriodosAcademicos(periodos)
+            
+            // Formatear periodos con información adicional
+            const periodosFormateados = {}
+            Object.keys(periodos).forEach(numero => {
+                const p = periodos[numero]
+                if (p.fechaInicio && p.fechaFin) {
+                    periodosFormateados[numero] = {
+                        nombre: `Período ${numero}`,
+                        fechaInicio: p.fechaInicio,
+                        fechaFin: p.fechaFin,
+                        descripcion: formatearDescripcionPeriodo(p.fechaInicio, p.fechaFin)
+                    }
+                }
+            })
+            
+            if (Object.keys(periodosFormateados).length > 0) {
+                setPeriodosAcademicos(periodosFormateados)
+                console.log('✅ Períodos académicos cargados:', periodosFormateados)
+            }
         } catch (error) {
-
+            console.error('❌ Error cargando períodos académicos:', error)
         }
+    }
+
+    // Función auxiliar para formatear descripción de período
+    const formatearDescripcionPeriodo = (fechaInicio, fechaFin) => {
+        const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+        const inicio = new Date(fechaInicio + 'T00:00:00')
+        const fin = new Date(fechaFin + 'T00:00:00')
+        return `${inicio.getDate()} ${meses[inicio.getMonth()]} - ${fin.getDate()} ${meses[fin.getMonth()]}`
     }
 
     const cargarDatos = async () => {

@@ -80,8 +80,7 @@ export default function Asistencia() {
     // Estados para modal de agregar estudiante
     const [showAddStudentModal, setShowAddStudentModal] = useState(false)
     const [studentForm, setStudentForm] = useState({
-        nombre: '',
-        codigo: ''
+        nombre: ''
     })
 
     // Estados para indicador de guardado automático
@@ -169,27 +168,34 @@ export default function Asistencia() {
         }
     }
 
-    // Función para agregar estudiante (igual que en Materias)
+    // Función para generar código automático secuencial
+    const generarCodigoAutomatico = () => {
+        const numeros = estudiantes
+            .map(est => {
+                const match = est.codigo.match(/\d+/)
+                return match ? parseInt(match[0]) : 0
+            })
+            .filter(num => !isNaN(num))
+
+        const maxNumero = numeros.length > 0 ? Math.max(...numeros) : 0
+        const siguienteNumero = maxNumero + 1
+        return siguienteNumero.toString().padStart(3, '0')
+    }
+
+    // Función para agregar estudiante con código automático
     const handleAddStudent = async () => {
-        if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) {
-            mostrarEstadoGuardado('❌ Por favor completa todos los campos')
+        if (!studentForm.nombre.trim()) {
+            mostrarEstadoGuardado('❌ Por favor ingresa el nombre del estudiante')
             return
         }
 
         try {
-            let codigoFinal = studentForm.codigo.trim()
-
-            // Verificar si el código ya existe
-            const codigoExiste = estudiantes.some(est => est.codigo === codigoFinal)
-            if (codigoExiste) {
-                // Generar automáticamente el siguiente código disponible
-                codigoFinal = generarSiguienteCodigo(codigoFinal)
-                mostrarEstadoGuardado(`📝 Código actualizado automáticamente: ${codigoFinal}`)
-            }
+            // Generar código automáticamente
+            const codigoAutomatico = generarCodigoAutomatico()
 
             const nuevoEstudiante = {
                 nombre: studentForm.nombre.trim(),
-                codigo: codigoFinal,
+                codigo: codigoAutomatico,
                 grado: auth.getCurrentUser()?.grado || 'Sin especificar'
             }
 
@@ -199,10 +205,10 @@ export default function Asistencia() {
             setEstudiantes(prev => [...prev, estudianteGuardado].sort((a, b) => {
                 return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
             }))
-            setStudentForm({ nombre: '', codigo: '' })
+            setStudentForm({ nombre: '' })
             setShowAddStudentModal(false)
 
-            mostrarEstadoGuardado(`✅ Estudiante agregado: ${estudianteGuardado.codigo}`)
+            mostrarEstadoGuardado(`✅ ${estudianteGuardado.nombre} agregado (${estudianteGuardado.codigo})`)
         } catch (error) {
             mostrarEstadoGuardado(`❌ Error al agregar estudiante: ${error.message}`)
         }
@@ -1438,17 +1444,10 @@ export default function Asistencia() {
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Código del estudiante
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={studentForm.codigo}
-                                        onChange={(e) => setStudentForm(prev => ({ ...prev, codigo: e.target.value }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                                        placeholder="Ej: 5B011"
-                                    />
+                                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                    <p className="text-sm text-blue-800">
+                                        ℹ️ El código se generará automáticamente
+                                    </p>
                                 </div>
                             </div>
 

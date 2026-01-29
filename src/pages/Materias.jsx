@@ -29,8 +29,7 @@ export default function Materias() {
         horario: ''
     })
     const [studentForm, setStudentForm] = useState({
-        nombre: '',
-        codigo: ''
+        nombre: ''
     })
 
     // Estado para indicador de guardado automático
@@ -763,23 +762,33 @@ export default function Materias() {
         }
     }
 
+    // Función para generar código automático secuencial
+    const generarCodigoAutomatico = () => {
+        const numeros = estudiantes
+            .map(est => {
+                const match = est.codigo.match(/\d+/)
+                return match ? parseInt(match[0]) : 0
+            })
+            .filter(num => !isNaN(num))
+
+        const maxNumero = numeros.length > 0 ? Math.max(...numeros) : 0
+        const siguienteNumero = maxNumero + 1
+        return siguienteNumero.toString().padStart(3, '0')
+    }
+
     const handleAddStudent = async () => {
-        if (!studentForm.nombre.trim() || !studentForm.codigo.trim()) return
+        if (!studentForm.nombre.trim()) {
+            mostrarEstadoGuardado('❌ Por favor ingresa el nombre del estudiante')
+            return
+        }
 
         try {
-            let codigoFinal = studentForm.codigo.trim()
-
-            // Verificar si el código ya existe
-            const codigoExiste = estudiantes.some(est => est.codigo === codigoFinal)
-            if (codigoExiste) {
-                // Generar automáticamente el siguiente código disponible
-                codigoFinal = generarSiguienteCodigo(codigoFinal)
-                mostrarEstadoGuardado(`Código actualizado automáticamente: ${codigoFinal}`)
-            }
+            // Generar código automáticamente
+            const codigoAutomatico = generarCodigoAutomatico()
 
             const nuevoEstudiante = {
                 nombre: studentForm.nombre.trim(),
-                codigo: codigoFinal,
+                codigo: codigoAutomatico,
                 grado: auth.getCurrentUser()?.grado || 'Sin especificar'
             }
 
@@ -793,7 +802,7 @@ export default function Materias() {
             setEstudiantes(prev => [...prev, estudianteTemporal].sort((a, b) => {
                 return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
             }))
-            setStudentForm({ nombre: '', codigo: '' })
+            setStudentForm({ nombre: '' })
             setShowAddStudentModal(false)
 
             // Guardar en la base de datos en segundo plano
@@ -801,7 +810,7 @@ export default function Materias() {
                 try {
                     const estudianteGuardado = await db.guardarEstudiante(nuevoEstudiante)
                     console.log('✅ Estudiante guardado:', estudianteGuardado)
-                    mostrarEstadoGuardado(`Estudiante agregado: ${estudianteGuardado.codigo}`)
+                    mostrarEstadoGuardado(`✅ ${estudianteGuardado.nombre} agregado (${estudianteGuardado.codigo})`)
                 } catch (error) {
                     console.error('❌ Error guardando estudiante:', error)
                     // Revertir cambios si hay error
@@ -2093,17 +2102,10 @@ export default function Materias() {
                                     />
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Código Estudiantil *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={studentForm.codigo}
-                                        onChange={(e) => setStudentForm({ ...studentForm, codigo: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        placeholder="Ej: 5B011"
-                                    />
+                                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                    <p className="text-sm text-blue-800">
+                                        ℹ️ El código se generará automáticamente
+                                    </p>
                                 </div>
                             </div>
 

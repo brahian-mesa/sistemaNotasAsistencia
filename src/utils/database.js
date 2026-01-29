@@ -115,14 +115,22 @@ class LocalDatabase {
 
   async eliminarEstudiante(id) {
     try {
+      // Eliminar asistencias del estudiante
+      await supabase.from("asistencias").delete().eq("estudiante_id", id);
+      
+      // Eliminar notas individuales del estudiante
+      await supabase.from("notas_individuales").delete().eq("estudiante_id", id);
+      
+      // Finalmente, eliminar el estudiante
       const { error } = await supabase
         .from("estudiantes")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+      console.log(`✅ Estudiante ${id} y sus datos relacionados eliminados.`);
     } catch (error) {
-      console.error("Error eliminando estudiante:", error);
+      console.error("Error eliminando estudiante y sus datos relacionados:", error);
       throw error;
     }
   }

@@ -38,7 +38,7 @@ const Configuracion = () => {
         try {
             const periodosData = await db.getPeriodosAcademicos();
             console.log('📥 Períodos recibidos de BD:', periodosData);
-            
+
             if (periodosData && Object.keys(periodosData).length > 0) {
                 // Los períodos vienen como { 1: {fechaInicio, fechaFin}, 2: {...}, ... }
                 setPeriodosAcademicos(periodosData);
@@ -60,7 +60,7 @@ const Configuracion = () => {
         setSaving(true);
         try {
             console.log('📅 Intentando guardar períodos:', periodosAcademicos);
-            
+
             // Validar que al menos un periodo tenga fechas
             const algunPeriodoCompleto = Object.values(periodosAcademicos).some(
                 periodo => periodo && periodo.fechaInicio && periodo.fechaFin
@@ -78,12 +78,12 @@ const Configuracion = () => {
 
             setSaveMessage('✅ Fechas de períodos actualizadas correctamente');
             console.log('✅ Períodos académicos guardados exitosamente');
-            
+
             // Recargar los periodos para confirmar
             setTimeout(() => {
                 cargarPeriodos();
             }, 500);
-            
+
             setTimeout(() => setSaveMessage(''), 4000);
         } catch (error) {
             console.error('❌ Error guardando períodos:', error);

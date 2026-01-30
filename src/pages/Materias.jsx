@@ -2143,7 +2143,7 @@ export default function Materias() {
                                 </button>
                                 <button
                                     onClick={handleAddStudent}
-                                    disabled={!studentForm.nombre.trim() || !studentForm.codigo.trim()}
+                                    disabled={!studentForm.nombre.trim()}
                                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                                 >
                                     Agregar

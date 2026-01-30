@@ -454,10 +454,10 @@ class LocalDatabase {
   async guardarPeriodosAcademicos(periodos) {
     try {
       console.log("🔍 Iniciando guardarPeriodosAcademicos con:", periodos);
-      
+
       const user = this.getCurrentUser();
       console.log("👤 Usuario actual:", user);
-      
+
       if (!user) throw new Error("Usuario no autenticado");
 
       const periodosArray = Object.entries(periodos)
@@ -485,7 +485,7 @@ class LocalDatabase {
         .from("periodos")
         .delete()
         .eq("usuario_id", user.id);
-      
+
       console.log("🗑️ Resultado de eliminación:", deleteResult);
 
       // Insertar los nuevos periodos
@@ -499,7 +499,7 @@ class LocalDatabase {
         console.error("❌ Error de Supabase al insertar:", error);
         throw error;
       }
-      
+
       console.log("✅ Períodos guardados exitosamente:", data);
       console.log(
         "✅ Total períodos académicos guardados:",
